@@ -17,6 +17,7 @@ categories = ["rust-patterns"] # Removed "no-std" as std is currently used
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports"] }
+proptest = "=1.4.0" # MSRV-1.66 verified; requires Cargo.lock pins (ppv-lite86 0.2.17, tempfile 3.8.1)
 
 [[bench]]
 name = "compare"

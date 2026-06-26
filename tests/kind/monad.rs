@@ -548,8 +548,7 @@ mod cfn_kind_monad_laws {
         let env_val: Env = 5;
         let x: i32 = 10;
 
-        let mma: CFn<Env, CFn<Env, i32>> =
-            CFn::new(move |_env_outer: Env| CFnKind::<Env>::pure(x.clone())); // Renamed Marker
+        let mma: CFn<Env, CFn<Env, i32>> = CFn::new(move |_env_outer: Env| CFnKind::<Env>::pure(x)); // Renamed Marker
 
         let lhs_cfn: CFn<Env, i32> = CFnKind::<Env>::join(mma); // Renamed Marker
         let rhs_cfn: CFn<Env, i32> = CFnKind::<Env>::pure(x); // Renamed Marker
@@ -687,7 +686,7 @@ mod cfn_once_kind_monad_laws {
         let x: i32 = 10;
 
         let mma: CFnOnce<Env, CFnOnce<Env, i32>> =
-            CFnOnce::new(move |_env_outer: Env| CFnOnceKind::<Env>::pure(x.clone())); // Renamed Marker
+            CFnOnce::new(move |_env_outer: Env| CFnOnceKind::<Env>::pure(x)); // Renamed Marker
 
         let lhs_cfn_once: CFnOnce<Env, i32> = CFnOnceKind::<Env>::join(mma); // Renamed Marker
         let rhs_cfn_once: CFnOnce<Env, i32> = CFnOnceKind::<Env>::pure(x); // Renamed Marker
