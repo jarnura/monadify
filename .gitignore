@@ -16,3 +16,9 @@ Cargo.lock
 
 # Ignore memory-bank directory
 /memory-bank/
+
+# Babysitter (a5c) — kept local/on-demand, not tracked
+.a5c/
+# Credentials are always ignored for security
+.a5c/creds.env
+.a5c/creds.env.tmp.*

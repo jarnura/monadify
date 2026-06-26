@@ -81,3 +81,54 @@ named `hindsight`.
   `tags=["project:monadify", …]` so the bank stays current. Memories tagged
   `status:uncommitted` describe in-progress WIP and go stale once committed —
   refresh them after committing.
+
+## Babysitter
+
+This project is onboarded for **babysitter** orchestration; the project profile
+lives at `.a5c/project-profile.json` (written by `project-install`).
+
+### Methodology
+
+- **Primary — hypothesis-driven-development:** treat every typeclass law (Functor
+  identity/composition, Applicative, Monad left/right-identity + associativity,
+  Profunctor) as a falsifiable hypothesis and verify it with property-based tests
+  (`proptest`) across generated inputs, layered on the existing example-based law
+  tests. Use this for the top correctness/law-coverage goal.
+- **Backbone — atdd-tdd:** write the law/property test first (RED), then implement
+  the instance (GREEN), matching the project rule that an instance ships with its
+  matching law test. Use for every new trait impl or concrete instance.
+- **For big changes — evolutionary:** drive encoding/typeclass changes as small,
+  reviewable, law-test-green increments instead of big-bang 26–50 file rewrites.
+  Use when touching the high-churn core trait hierarchy or the HKT encoding.
+
+### Recommended skills / agents
+
+Must-have skills: **rust-testing** (proptest/property patterns + coverage),
+**tdd** (write-test-first enforcement), **verify** (one-shot fmt + clippy
+`--all-targets` + default/legacy test matrix + MSRV + doc build), **rust-patterns**
+(idiomatic Rust/GAT/trait-bound guidance, incl. the `CFn`-not-`Clone` constraint),
+**rust-review** (ownership/lifetime/coherence review of core trait edits).
+
+Must-have agents: **tdd-guide** (drives the law-test-first loop), **test-generator**
+(generates property/law tests for new and existing instances), **rust-reviewer**
+(mandatory review of the high-churn core trait files), **rust-build-resolver**
+(minimal-diff fixes for cargo/borrow-checker/feature-matrix breakage),
+**architect** (designs around `CFn`-not-`Clone` and shapes new transformers
+like StateT/WriterT before coding).
+
+### Autonomy
+
+**Semi-autonomous:** proceed on routine work (research, tests, refactors, docs),
+but break for review at phase boundaries and before commits to `main`. ALWAYS
+break on destructive-git operations and crates.io publish/release.
+
+### CI/CD
+
+Babysitter is kept **LOCAL / on-demand** — it is intentionally NOT wired into
+GitHub Actions. The existing `.github/workflows/rust.yml` remains the automated
+Rust quality gate (fmt, clippy, default+legacy test matrix, MSRV 1.66).
+
+### How to run
+
+- `/babysitter:babysit` — orchestrate a run (or use the babysitter CLI).
+- `/babysitter:plan` — plan a run without executing it.
