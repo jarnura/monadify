@@ -30,8 +30,11 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Lint (deny warnings)
+      - name: Lint lib & bins (deny warnings)
         run: cargo clippy --all-features -- -D warnings
+      # Guards benches/compare.rs from silently rotting (e.g. stale marker names).
+      - name: Lint benches (deny warnings)
+        run: cargo clippy --all-features --benches -- -D warnings
 
   test:
     name: test (${{ matrix.name }})

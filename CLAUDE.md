@@ -50,9 +50,10 @@ Concrete instances implementing the full hierarchy (where lawful): `Option`,
 and `cargo test --all-features`. CI (`.github/workflows/rust.yml`) mirrors these in
 separate jobs — `fmt`, `clippy` (`--all-features -- -D warnings`), `test` (default +
 `legacy` feature matrix, incl. doc-tests), and an `msrv` job checking against Rust
-1.66. Still **not** enforced in CI (pre-existing gaps): `clippy --all-targets` /
-`cargo bench` (`benches/compare.rs` references renamed markers and won't compile) and
-`cargo doc -D warnings` (one rustdoc link warning).
+1.66. The `clippy` job also lints `--benches` so `benches/compare.rs` can't
+silently rot. Still **not** enforced in CI (remaining gaps): full
+`clippy --all-targets` (the test files have ~50 auto-fixable lints, mostly
+`clone_on_copy`) and `cargo doc -D warnings` (one rustdoc link warning).
 
 ```bash
 cargo test                  # default kind-based suite
