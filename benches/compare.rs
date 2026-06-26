@@ -1,8 +1,8 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use monadify::functor::Functor;
-use monadify::kind_based::kind::{OptionHKTMarker, ResultHKTMarker, VecHKTMarker};
+use monadify::kind_based::kind::{OptionKind, ResultKind, VecKind};
 #[cfg(feature = "legacy")]
-use monadify::legacy::functor::Functor as LegacyFunctor; // Import HKT markers
+use monadify::legacy::functor::Functor as LegacyFunctor; // Import Kind markers
 
 // Benchmark for Option<T>
 pub fn map_option(c: &mut Criterion) {
@@ -11,7 +11,7 @@ pub fn map_option(c: &mut Criterion) {
     let input_ref = &input; // Criterion's bench_with_input expects a reference
 
     group.bench_with_input(BenchmarkId::new("hkt_map_option", 1), input_ref, |b, &s| {
-        b.iter(|| OptionHKTMarker::map(s, |x: i32| x + 1)) // Call on marker type
+        b.iter(|| OptionKind::map(s, |x: i32| x + 1)) // Call on marker type
     });
 
     group.bench_with_input(
@@ -43,7 +43,7 @@ pub fn map_result(c: &mut Criterion) {
         BenchmarkId::new("hkt_map_result", 1),
         input_ref,
         |b, s_ref: &Result<i32, String>| {
-            b.iter(|| ResultHKTMarker::<String>::map(s_ref.clone(), |x: i32| x + 1))
+            b.iter(|| ResultKind::<String>::map(s_ref.clone(), |x: i32| x + 1))
             // Call on marker type
         },
     );
@@ -78,7 +78,7 @@ pub fn map_vec(c: &mut Criterion) {
         BenchmarkId::new("hkt_map_vec", input_vec.len()),
         input_vec_ref,
         |b, s_vec| {
-            b.iter(|| VecHKTMarker::map(s_vec.clone(), |x: i32| x + 1)) // Call on marker type
+            b.iter(|| VecKind::map(s_vec.clone(), |x: i32| x + 1)) // Call on marker type
         },
     );
 
@@ -110,6 +110,10 @@ use monadify::legacy::monad::Bind as LegacyBind;
 use monadify::monad::Bind; // Monad import removed // Import CFn
 
 // Benchmark for Apply on Option<T>
+// The `manual_*` arm intentionally hand-rolls the match (rather than `map`) —
+// it is the manual baseline we compare HKT `apply` against, so the lint is
+// suppressed.
+#[allow(clippy::manual_map)]
 pub fn apply_option(c: &mut Criterion) {
     let mut group = c.benchmark_group("Apply_Option_ap");
     let static_val_opt: Option<i32> = Some(1);
@@ -121,7 +125,7 @@ pub fn apply_option(c: &mut Criterion) {
         |b, &val_s| {
             b.iter(|| {
                 let func_opt: Option<CFn<i32, i32>> = Some(CFn::new(|x: i32| x + 1));
-                OptionHKTMarker::apply(val_s, func_opt) // Call on marker type
+                OptionKind::apply(val_s, func_opt) // Call on marker type
             })
         },
     );
@@ -159,6 +163,9 @@ pub fn apply_option(c: &mut Criterion) {
 }
 
 // Benchmark for Monad on Option<T>
+// The `native_*` arm intentionally uses `and_then` (not `map`) — it is the
+// native baseline we compare HKT `bind` against, so the lint is suppressed.
+#[allow(clippy::bind_instead_of_map)]
 pub fn bind_option(c: &mut Criterion) {
     let mut group = c.benchmark_group("Monad_Option_bind");
     let input: Option<i32> = Some(1);
@@ -168,7 +175,7 @@ pub fn bind_option(c: &mut Criterion) {
         BenchmarkId::new("hkt_bind_option", 1),
         input_ref,
         |b, &s_opt| {
-            b.iter(|| OptionHKTMarker::bind(s_opt, |x: i32| Some(x + 1))) // Call on marker type
+            b.iter(|| OptionKind::bind(s_opt, |x: i32| Some(x + 1))) // Call on marker type
         },
     );
 
@@ -203,7 +210,7 @@ pub fn apply_result(c: &mut Criterion) {
         |b, val_s_ref: &Result<i32, String>| {
             b.iter(|| {
                 let func_res: Result<CFn<i32, i32>, String> = Ok(CFn::new(|x: i32| x + 1));
-                ResultHKTMarker::<String>::apply(val_s_ref.clone(), func_res) // Call on marker type
+                ResultKind::<String>::apply(val_s_ref.clone(), func_res) // Call on marker type
             })
         },
     );
@@ -242,6 +249,9 @@ pub fn apply_result(c: &mut Criterion) {
 }
 
 // Benchmark for Bind on Result<T, E>
+// The `native_*` arm intentionally uses `and_then` (not `map`) — it is the
+// native baseline we compare HKT `bind` against, so the lint is suppressed.
+#[allow(clippy::bind_instead_of_map)]
 pub fn bind_result(c: &mut Criterion) {
     let mut group = c.benchmark_group("Monad_Result_bind");
     let input: Result<i32, String> = Ok(1);
@@ -251,7 +261,7 @@ pub fn bind_result(c: &mut Criterion) {
         BenchmarkId::new("hkt_bind_result", 1),
         input_ref,
         |b, s_res_ref: &Result<i32, String>| {
-            b.iter(|| ResultHKTMarker::<String>::bind(s_res_ref.clone(), |x: i32| Ok(x + 1)))
+            b.iter(|| ResultKind::<String>::bind(s_res_ref.clone(), |x: i32| Ok(x + 1)))
             // Call on marker type
         },
     );
@@ -293,7 +303,7 @@ pub fn apply_vec(c: &mut Criterion) {
         |b, val_s_vec_ref: &Vec<i32>| {
             b.iter(|| {
                 let func_vec: Vec<CFn<i32, i32>> = vec![CFn::new(|x: i32| x + 1)];
-                VecHKTMarker::apply(val_s_vec_ref.clone(), func_vec) // Call on marker type
+                VecKind::apply(val_s_vec_ref.clone(), func_vec) // Call on marker type
             })
         },
     );
@@ -345,7 +355,7 @@ pub fn bind_vec(c: &mut Criterion) {
         BenchmarkId::new("hkt_bind_vec", input_vec.len()),
         input_vec_ref,
         |b, s_vec_ref: &Vec<i32>| {
-            b.iter(|| VecHKTMarker::bind(s_vec_ref.clone(), |x: i32| vec![x + 1, x + 2]))
+            b.iter(|| VecKind::bind(s_vec_ref.clone(), |x: i32| vec![x + 1, x + 2]))
             // Call on marker type
         },
     );
