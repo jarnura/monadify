@@ -35,7 +35,7 @@
 //!   `pure(compose) <*> u <*> v <*> w` is not constructible, exactly as
 //!   documented in the sibling `apply.rs` — `pure(compose)` would need the
 //!   middle composing closure to *move* a captured `CFn` into its result
-//!   (making it `FnOnce`, but `CFn::new` requires `Fn`), and the usual clone
+//!   (making it `FnOnce`, but `RcFn::new` requires `Fn`), and the usual clone
 //!   escape hatch is unavailable because **`CFn` is not `Clone`**. So we build
 //!   the fully-constructible right-associated side `u <*> (v <*> w)` —
 //!   `apply(apply(w, v), u)` — and assert it equals the ground truth `g(f(x))`
@@ -60,7 +60,7 @@ use super::{
 };
 use monadify::applicative::kind::Applicative;
 use monadify::apply::kind::Apply;
-use monadify::function::CFn;
+use monadify::function::RcFn;
 use monadify::identity::{Identity, IdentityKind};
 use monadify::kind_based::kind::{OptionKind, ResultKind, VecKind};
 use proptest::prelude::*;
@@ -75,7 +75,7 @@ proptest! {
     /// Applicative identity for `Option`: `apply(v, pure(id)) == v`.
     #[test]
     fn option_applicative_identity(v in arb_option_i32()) {
-        let pure_id: Option<CFn<i32, i32>> = OptionKind::pure(CFn::new(|x: i32| x));
+        let pure_id: Option<RcFn<i32, i32>> = OptionKind::pure(RcFn::new(|x: i32| x));
         prop_assert_eq!(OptionKind::apply(v, pure_id), v);
     }
 
@@ -87,7 +87,7 @@ proptest! {
         (a, b) in arb_linear_closure_params(),
     ) {
         let pure_x: Option<i32> = OptionKind::pure(x);
-        let pure_f: Option<CFn<i32, i32>> = OptionKind::pure(linear_cfn(a, b));
+        let pure_f: Option<RcFn<i32, i32>> = OptionKind::pure(linear_cfn(a, b));
         let lhs = OptionKind::apply(pure_x, pure_f);
 
         let mut f = linear_fn(a, b);
@@ -103,7 +103,7 @@ proptest! {
         (a, b) in arb_linear_closure_params(),
         present in any::<bool>(),
     ) {
-        let make_u = || -> Option<CFn<i32, i32>> {
+        let make_u = || -> Option<RcFn<i32, i32>> {
             if present { Some(linear_cfn(a, b)) } else { None }
         };
 
@@ -111,8 +111,8 @@ proptest! {
         let lhs = OptionKind::apply(OptionKind::pure(y), make_u());
 
         // RHS: pure(|f| f(y)) <*> u == apply(u, pure(|f| f(y)))
-        let pure_interchange: Option<CFn<CFn<i32, i32>, i32>> =
-            OptionKind::pure(CFn::new(move |f: CFn<i32, i32>| f.call(y)));
+        let pure_interchange: Option<RcFn<RcFn<i32, i32>, i32>> =
+            OptionKind::pure(RcFn::new(move |f: RcFn<i32, i32>| f.call(y)));
         let rhs = OptionKind::apply(make_u(), pure_interchange);
 
         prop_assert_eq!(lhs, rhs);
@@ -132,8 +132,8 @@ proptest! {
         f_present in any::<bool>(),
         g_present in any::<bool>(),
     ) {
-        let v: Option<CFn<i32, i32>> = if f_present { Some(linear_cfn(fa, fb)) } else { None };
-        let u: Option<CFn<i32, i32>> = if g_present { Some(linear_cfn(ga, gb)) } else { None };
+        let v: Option<RcFn<i32, i32>> = if f_present { Some(linear_cfn(fa, fb)) } else { None };
+        let u: Option<RcFn<i32, i32>> = if g_present { Some(linear_cfn(ga, gb)) } else { None };
 
         let lhs = OptionKind::apply(OptionKind::apply(w, v), u);
 
@@ -154,8 +154,8 @@ proptest! {
     /// Applicative identity for `Result<i32, String>`: `apply(r, pure(id)) == r`.
     #[test]
     fn result_applicative_identity(r in arb_result_i32_string()) {
-        let pure_id: Result<CFn<i32, i32>, TestError> =
-            ResultKind::<TestError>::pure(CFn::new(|x: i32| x));
+        let pure_id: Result<RcFn<i32, i32>, TestError> =
+            ResultKind::<TestError>::pure(RcFn::new(|x: i32| x));
         prop_assert_eq!(ResultKind::<TestError>::apply(r.clone(), pure_id), r);
     }
 
@@ -167,7 +167,7 @@ proptest! {
         (a, b) in arb_linear_closure_params(),
     ) {
         let pure_x: Result<i32, TestError> = ResultKind::<TestError>::pure(x);
-        let pure_f: Result<CFn<i32, i32>, TestError> =
+        let pure_f: Result<RcFn<i32, i32>, TestError> =
             ResultKind::<TestError>::pure(linear_cfn(a, b));
         let lhs = ResultKind::<TestError>::apply(pure_x, pure_f);
 
@@ -185,7 +185,7 @@ proptest! {
         ok in any::<bool>(),
         e in ".*",
     ) {
-        let make_u = || -> Result<CFn<i32, i32>, TestError> {
+        let make_u = || -> Result<RcFn<i32, i32>, TestError> {
             if ok { Ok(linear_cfn(a, b)) } else { Err(e.clone()) }
         };
 
@@ -193,8 +193,8 @@ proptest! {
         let lhs = ResultKind::<TestError>::apply(ResultKind::<TestError>::pure(y), make_u());
 
         // RHS: pure(|f| f(y)) <*> u == apply(u, pure(|f| f(y)))
-        let pure_interchange: Result<CFn<CFn<i32, i32>, i32>, TestError> =
-            ResultKind::<TestError>::pure(CFn::new(move |f: CFn<i32, i32>| f.call(y)));
+        let pure_interchange: Result<RcFn<RcFn<i32, i32>, i32>, TestError> =
+            ResultKind::<TestError>::pure(RcFn::new(move |f: RcFn<i32, i32>| f.call(y)));
         let rhs = ResultKind::<TestError>::apply(make_u(), pure_interchange);
 
         prop_assert_eq!(lhs, rhs);
@@ -216,9 +216,9 @@ proptest! {
         ev in ".*",
         eu in ".*",
     ) {
-        let v: Result<CFn<i32, i32>, TestError> =
+        let v: Result<RcFn<i32, i32>, TestError> =
             if f_ok { Ok(linear_cfn(fa, fb)) } else { Err(ev.clone()) };
-        let u: Result<CFn<i32, i32>, TestError> =
+        let u: Result<RcFn<i32, i32>, TestError> =
             if g_ok { Ok(linear_cfn(ga, gb)) } else { Err(eu.clone()) };
 
         let inner = <ResultKind<TestError> as Apply<i32, i32>>::apply(w.clone(), v);
@@ -247,7 +247,7 @@ proptest! {
     /// Applicative identity for `Identity`: `apply(i, pure(id)) == i`.
     #[test]
     fn identity_applicative_identity(i in arb_identity_i32()) {
-        let pure_id: Identity<CFn<i32, i32>> = IdentityKind::pure(CFn::new(|x: i32| x));
+        let pure_id: Identity<RcFn<i32, i32>> = IdentityKind::pure(RcFn::new(|x: i32| x));
         prop_assert_eq!(IdentityKind::apply(i.clone(), pure_id), i);
     }
 
@@ -259,7 +259,7 @@ proptest! {
         (a, b) in arb_linear_closure_params(),
     ) {
         let pure_x: Identity<i32> = IdentityKind::pure(x);
-        let pure_f: Identity<CFn<i32, i32>> = IdentityKind::pure(linear_cfn(a, b));
+        let pure_f: Identity<RcFn<i32, i32>> = IdentityKind::pure(linear_cfn(a, b));
         let lhs = IdentityKind::apply(pure_x, pure_f);
 
         let mut f = linear_fn(a, b);
@@ -274,14 +274,14 @@ proptest! {
         y in any::<i32>(),
         (a, b) in arb_linear_closure_params(),
     ) {
-        let make_u = || -> Identity<CFn<i32, i32>> { Identity(linear_cfn(a, b)) };
+        let make_u = || -> Identity<RcFn<i32, i32>> { Identity(linear_cfn(a, b)) };
 
         // LHS: u <*> pure(y) == apply(pure(y), u)
         let lhs = IdentityKind::apply(IdentityKind::pure(y), make_u());
 
         // RHS: pure(|f| f(y)) <*> u == apply(u, pure(|f| f(y)))
-        let pure_interchange: Identity<CFn<CFn<i32, i32>, i32>> =
-            IdentityKind::pure(CFn::new(move |f: CFn<i32, i32>| f.call(y)));
+        let pure_interchange: Identity<RcFn<RcFn<i32, i32>, i32>> =
+            IdentityKind::pure(RcFn::new(move |f: RcFn<i32, i32>| f.call(y)));
         let rhs = IdentityKind::apply(make_u(), pure_interchange);
 
         prop_assert_eq!(lhs, rhs);
@@ -324,7 +324,7 @@ proptest! {
         y in any::<i32>(),
         params in prop::collection::vec(arb_linear_closure_params(), 0..=8),
     ) {
-        let u: Vec<CFn<i32, i32>> = params.iter().map(|&(a, b)| linear_cfn(a, b)).collect();
+        let u: Vec<RcFn<i32, i32>> = params.iter().map(|&(a, b)| linear_cfn(a, b)).collect();
 
         // LHS: u <*> pure(y) == apply(pure(y), u)
         let lhs = VecKind::apply(VecKind::pure(y), u);

@@ -1,7 +1,7 @@
 use monadify::applicative::kind::Applicative; // Changed hkt to kind
-use monadify::function::{CFn, CFnOnce};
+use monadify::function::{CFnOnce, RcFn};
 use monadify::functor::kind::Functor; // Changed hkt to kind
-use monadify::kind_based::kind::{CFnKind, CFnOnceKind, OptionKind, ResultKind, VecKind}; // ...HKTMarker to ...Kind
+use monadify::kind_based::kind::{CFnOnceKind, OptionKind, RcFnKind, ResultKind, VecKind};
 use monadify::monad::kind::{Bind, Monad}; // Changed hkt to kind
 
 // Common error type for Result tests
@@ -471,107 +471,103 @@ mod vec_kind_monad_laws {
     }
 }
 
-mod cfn_kind_monad_laws {
-    // Renamed module
+mod rcfn_kind_monad_laws {
     use super::*;
     type Env = i32;
 
-    // 1. Left Identity: CFnKind::pure(a).bind(f) == f(a)
+    // 1. Left Identity: RcFnKind::pure(a).bind(f) == f(a)
     #[test]
-    fn cfn_kind_monad_left_identity() {
-        // Renamed test
+    fn rcfn_kind_monad_left_identity() {
         let env_val: Env = 5;
         let a: i32 = 10;
 
-        let f = clone_fn(move |x: i32| -> CFn<Env, String> {
-            CFn::new(move |env: Env| (x + env).to_string())
+        let f = clone_fn(move |x: i32| -> RcFn<Env, String> {
+            RcFn::new(move |env: Env| (x + env).to_string())
         });
 
-        let pure_a_cfn: CFn<Env, i32> = CFnKind::<Env>::pure(a); // Renamed Marker
-        let lhs_cfn: CFn<Env, String> = CFnKind::<Env>::bind(pure_a_cfn, f.clone()); // Renamed Marker
+        let pure_a: RcFn<Env, i32> = RcFnKind::<Env>::pure(a);
+        let lhs: RcFn<Env, String> = RcFnKind::<Env>::bind(pure_a, f.clone());
 
-        let rhs_cfn: CFn<Env, String> = f.clone()(a);
+        let rhs: RcFn<Env, String> = f.clone()(a);
 
-        assert_eq!(lhs_cfn.call(env_val), rhs_cfn.call(env_val));
-        assert_eq!(lhs_cfn.call(env_val), "15".to_string());
+        assert_eq!(lhs.call(env_val), rhs.call(env_val));
+        assert_eq!(lhs.call(env_val), "15".to_string());
     }
 
-    // 2. Right Identity: m.bind(CFnKind::pure) == m
+    // 2. Right Identity: m.bind(RcFnKind::pure) == m
     #[test]
-    fn cfn_kind_monad_right_identity() {
-        // Renamed test
+    fn rcfn_kind_monad_right_identity() {
         let env_val: Env = 7;
-        let m_creator = || CFn::new(move |env: Env| env * 2);
+        let m_creator = || RcFn::new(move |env: Env| env * 2);
 
-        let pure_fn = clone_fn(|val: i32| CFnKind::<Env>::pure(val)); // Renamed Marker
+        let pure_fn = clone_fn(|val: i32| RcFnKind::<Env>::pure(val));
 
-        let lhs_cfn: CFn<Env, i32> = CFnKind::<Env>::bind(m_creator(), pure_fn); // Renamed Marker
-        let rhs_cfn: CFn<Env, i32> = m_creator();
+        let lhs: RcFn<Env, i32> = RcFnKind::<Env>::bind(m_creator(), pure_fn);
+        let rhs: RcFn<Env, i32> = m_creator();
 
-        assert_eq!(lhs_cfn.call(env_val), rhs_cfn.call(env_val));
-        assert_eq!(lhs_cfn.call(env_val), 14);
+        assert_eq!(lhs.call(env_val), rhs.call(env_val));
+        assert_eq!(lhs.call(env_val), 14);
     }
 
-    // 3. Associativity: m.bind(f).bind(g) == m.bind(|x| f(x).bind(g))
+    // 3. Associativity
     #[test]
-    fn cfn_kind_monad_associativity() {
-        // Renamed test
+    fn rcfn_kind_monad_associativity() {
         let env_val: Env = 3;
-        let m_creator = || CFn::new(move |env: Env| env + 1);
+        let m_creator = || RcFn::new(move |env: Env| env + 1);
 
-        let f =
-            clone_fn(move |x: i32| -> CFn<Env, f64> { CFn::new(move |env: Env| (x * env) as f64) });
-
-        let g = clone_fn(move |y: f64| -> CFn<Env, String> {
-            CFn::new(move |env: Env| (y + (env as f64)).to_string())
+        let f = clone_fn(move |x: i32| -> RcFn<Env, f64> {
+            RcFn::new(move |env: Env| (x * env) as f64)
         });
 
-        let bound_f: CFn<Env, f64> = CFnKind::<Env>::bind(m_creator(), f.clone()); // Renamed Marker
-        let lhs_cfn: CFn<Env, String> = CFnKind::<Env>::bind(bound_f, g.clone()); // Renamed Marker
+        let g = clone_fn(move |y: f64| -> RcFn<Env, String> {
+            RcFn::new(move |env: Env| (y + (env as f64)).to_string())
+        });
+
+        let bound_f: RcFn<Env, f64> = RcFnKind::<Env>::bind(m_creator(), f.clone());
+        let lhs: RcFn<Env, String> = RcFnKind::<Env>::bind(bound_f, g.clone());
 
         let f_inner = f.clone();
         let g_inner = g.clone();
-        let composed_func = clone_fn(move |x_val: i32| -> CFn<Env, String> {
-            let fx: CFn<Env, f64> = f_inner.clone()(x_val);
-            CFnKind::<Env>::bind(fx, g_inner.clone()) // Renamed Marker
+        let composed_func = clone_fn(move |x_val: i32| -> RcFn<Env, String> {
+            let fx: RcFn<Env, f64> = f_inner.clone()(x_val);
+            RcFnKind::<Env>::bind(fx, g_inner.clone())
         });
-        let rhs_cfn: CFn<Env, String> = CFnKind::<Env>::bind(m_creator(), composed_func); // Renamed Marker
+        let rhs: RcFn<Env, String> = RcFnKind::<Env>::bind(m_creator(), composed_func);
 
-        assert_eq!(lhs_cfn.call(env_val), rhs_cfn.call(env_val));
-        assert_eq!(lhs_cfn.call(env_val), "15".to_string());
+        assert_eq!(lhs.call(env_val), rhs.call(env_val));
+        assert_eq!(lhs.call(env_val), "15".to_string());
     }
 
-    // Monad::join laws for CFnKind
+    // Monad::join laws for RcFnKind
     #[test]
-    fn cfn_kind_monad_join_law1() {
-        // Renamed test
+    fn rcfn_kind_monad_join_law1() {
         let env_val: Env = 5;
         let x: i32 = 10;
 
-        let mma: CFn<Env, CFn<Env, i32>> = CFn::new(move |_env_outer: Env| CFnKind::<Env>::pure(x)); // Renamed Marker
+        let mma: RcFn<Env, RcFn<Env, i32>> =
+            RcFn::new(move |_env_outer: Env| RcFnKind::<Env>::pure(x));
 
-        let lhs_cfn: CFn<Env, i32> = CFnKind::<Env>::join(mma); // Renamed Marker
-        let rhs_cfn: CFn<Env, i32> = CFnKind::<Env>::pure(x); // Renamed Marker
+        let lhs: RcFn<Env, i32> = RcFnKind::<Env>::join(mma);
+        let rhs: RcFn<Env, i32> = RcFnKind::<Env>::pure(x);
 
-        assert_eq!(lhs_cfn.call(env_val), rhs_cfn.call(env_val));
-        assert_eq!(lhs_cfn.call(env_val), 10);
+        assert_eq!(lhs.call(env_val), rhs.call(env_val));
+        assert_eq!(lhs.call(env_val), 10);
     }
 
     #[test]
-    fn cfn_kind_monad_join_law2() {
-        // Renamed test
+    fn rcfn_kind_monad_join_law2() {
         let env_val: Env = 7;
-        let m_creator = || CFn::new(move |env: Env| env * 3);
+        let m_creator = || RcFn::new(move |env: Env| env * 3);
 
-        let pure_fn = clone_fn(|val: i32| CFnKind::<Env>::pure(val)); // Renamed Marker
+        let pure_fn = clone_fn(|val: i32| RcFnKind::<Env>::pure(val));
 
-        let mapped_m_cfn: CFn<Env, CFn<Env, i32>> = CFnKind::<Env>::map(m_creator(), pure_fn); // Renamed Marker
+        let mapped_m: RcFn<Env, RcFn<Env, i32>> = RcFnKind::<Env>::map(m_creator(), pure_fn);
 
-        let lhs_cfn: CFn<Env, i32> = CFnKind::<Env>::join(mapped_m_cfn); // Renamed Marker
-        let rhs_cfn: CFn<Env, i32> = m_creator();
+        let lhs: RcFn<Env, i32> = RcFnKind::<Env>::join(mapped_m);
+        let rhs: RcFn<Env, i32> = m_creator();
 
-        assert_eq!(lhs_cfn.call(env_val), rhs_cfn.call(env_val));
-        assert_eq!(lhs_cfn.call(env_val), 21);
+        assert_eq!(lhs.call(env_val), rhs.call(env_val));
+        assert_eq!(lhs.call(env_val), 21);
     }
 }
 

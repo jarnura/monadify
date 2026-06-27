@@ -10,7 +10,7 @@
 //! Design reference:
 //! `.a5c/runs/01KW2RTB9JS5H05EYB7Z9P1YYY/artifacts/property-testing-design.md`.
 
-use monadify::function::CFn;
+use monadify::function::RcFn;
 use monadify::identity::Identity;
 use proptest::prelude::*;
 
@@ -63,11 +63,12 @@ pub fn linear_fn(a: i32, b: i32) -> impl FnMut(i32) -> i32 + Clone + 'static {
     move |x: i32| x.wrapping_mul(a).wrapping_add(b)
 }
 
-/// Fresh `CFn<i32, i32>` for Applicative `apply` (function-in-container) laws.
+/// Fresh `RcFn<i32, i32>` for Applicative `apply` (function-in-container) laws.
 ///
-/// Rebuilt per use because `CFn` is not `Clone`.
-pub fn linear_cfn(a: i32, b: i32) -> CFn<i32, i32> {
-    CFn::new(move |x: i32| x.wrapping_mul(a).wrapping_add(b))
+/// Rebuilt per use site; `RcFn` is `Clone` (O(1) Rc bump) so it can also be
+/// cloned cheaply when needed by cartesian `Vec` apply.
+pub fn linear_cfn(a: i32, b: i32) -> RcFn<i32, i32> {
+    RcFn::new(move |x: i32| x.wrapping_mul(a).wrapping_add(b))
 }
 
 // --- Smoke test: proves the harness compiles and runs ---

@@ -1,14 +1,14 @@
 #![cfg(all(test, feature = "legacy"))] // Ensure these run only when 'legacy' is active
 
 // Import necessary items from the monadify crate, pointing to legacy versions
-use monadify::function::CFn;
+use monadify::function::RcFn;
 use monadify::legacy::applicative::Applicative;
 use monadify::legacy::apply::Apply; // For apply
 use monadify::legacy::functor::Functor; // For map
 use monadify::legacy::identity::Identity;
 use monadify::legacy::monad::Bind; // For laws
 use monadify::legacy::transformers::reader::MonadReader;
-use monadify::legacy::transformers::reader::{Reader, ReaderT}; // CFn is not part of legacy/hkt split
+use monadify::legacy::transformers::reader::{Reader, ReaderT}; // RcFn is not part of legacy/hkt split
 
 #[test]
 fn test_reader_t_new_and_run() {
@@ -69,14 +69,14 @@ fn test_reader_t_apply() {
     };
     let reader_val: ReaderT<i32, Option<i32>, i32> = ReaderT::new(reader_val_fn);
 
-    let reader_func_fn = |env: i32| -> Option<CFn<i32, String>> {
+    let reader_func_fn = |env: i32| -> Option<RcFn<i32, String>> {
         if env > 0 {
-            Some(CFn::new(move |x: i32| format!("Env: {}, Val: {}", env, x)))
+            Some(RcFn::new(move |x: i32| format!("Env: {}, Val: {}", env, x)))
         } else {
             None
         }
     };
-    let reader_func: ReaderT<i32, Option<CFn<i32, String>>, CFn<i32, String>> =
+    let reader_func: ReaderT<i32, Option<RcFn<i32, String>>, RcFn<i32, String>> =
         ReaderT::new(reader_func_fn);
 
     let result_reader =
@@ -91,14 +91,14 @@ fn test_reader_t_apply() {
     let reader_val_always_some: ReaderT<i32, Option<i32>, i32> =
         ReaderT::new(reader_val_always_some_fn);
 
-    let reader_func_fn_env_neg = |env: i32| -> Option<CFn<i32, String>> {
+    let reader_func_fn_env_neg = |env: i32| -> Option<RcFn<i32, String>> {
         if env > 0 {
-            Some(CFn::new(move |x: i32| format!("Env: {}, Val: {}", env, x)))
+            Some(RcFn::new(move |x: i32| format!("Env: {}, Val: {}", env, x)))
         } else {
             None
         }
     };
-    let reader_func_env_neg: ReaderT<i32, Option<CFn<i32, String>>, CFn<i32, String>> =
+    let reader_func_env_neg: ReaderT<i32, Option<RcFn<i32, String>>, RcFn<i32, String>> =
         ReaderT::new(reader_func_fn_env_neg);
 
     let result_reader_2 = <ReaderT<i32, Option<i32>, i32> as Apply<i32>>::apply(

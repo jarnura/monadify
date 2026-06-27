@@ -1,7 +1,7 @@
 // Original imports from src/identity.rs kind_tests module, adjusted
 use monadify::applicative::kind::Applicative; // Changed hkt to kind
 use monadify::apply::kind::Apply; // Changed hkt to kind
-use monadify::function::CFn;
+use monadify::function::RcFn;
 use monadify::functor::kind::Functor; // Changed hkt to kind
 use monadify::identity::{Identity, IdentityKind}; // Changed HKTMarker to Kind
 use monadify::monad::kind::{Bind, Monad}; // Changed hkt to kind
@@ -23,7 +23,7 @@ fn test_identity_kind_functor_map() {
 fn test_identity_kind_apply() {
     // Renamed test
     let id_val: Identity<i32> = Identity(5);
-    let id_fn: Identity<CFn<i32, i32>> = Identity(CFn::new(|x| x * 2));
+    let id_fn: Identity<RcFn<i32, i32>> = Identity(RcFn::new(|x| x * 2));
     let result: Identity<i32> = IdentityKind::apply(id_val, id_fn); // Renamed Marker
     assert_eq!(result, Identity(10));
 }

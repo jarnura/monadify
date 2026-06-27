@@ -16,10 +16,8 @@ pub mod kind {
     //! It relies on the [`Kind1`] trait from `crate::kind_based::kind` to relate the
     //! marker `Self` to its concrete type application `Self::Of<T>`.
 
-    use crate::function::{CFn, CFnOnce, RcFn};
-    use crate::kind_based::kind::{
-        CFnKind, CFnOnceKind, Kind1, OptionKind, RcFnKind, ResultKind, VecKind,
-    };
+    use crate::function::{CFnOnce, RcFn};
+    use crate::kind_based::kind::{CFnOnceKind, Kind1, OptionKind, RcFnKind, ResultKind, VecKind};
     use std::rc::Rc;
 
     /// Represents a type constructor that can be mapped over, using the Kind pattern.
@@ -53,11 +51,11 @@ pub mod kind {
         ///   - `FnMut`: Allows mutation of captured state if needed, and covers `Fn` and `FnOnce`
         ///     that don't consume their captures by value on first call. Standard library `map`
         ///     methods (like `Option::map`, `Result::map`) often take `FnOnce`.
-        ///   - `Clone`: Necessary for some implementations like [`CFnKind`], where the
+        ///   - `Clone`: Necessary for some implementations like [`RcFnKind`], where the
         ///     function might need to be cloned if the resulting structure can be "called"
         ///     multiple times.
         ///   - `'static`: Often required when functions are stored or returned within structures
-        ///     like [`CFn`] or [`CFnOnce`], especially if they don't borrow from the local scope.
+        ///     like [`RcFn`] or [`CFnOnce`], especially if they don't borrow from the local scope.
         ///
         /// # Returns
         /// A new Kind-structured value `Self::Of<B>` containing the result(s) of
@@ -80,23 +78,6 @@ pub mod kind {
     impl<A, B> Functor<A, B> for VecKind {
         fn map(input: Self::Of<A>, func: impl FnMut(A) -> B + Clone + 'static) -> Self::Of<B> {
             input.into_iter().map(func).collect()
-        }
-    }
-
-    // Functor impl for CFnKind (maps over the output type of CFn)
-    // A is the original output type, B is the new output type
-    impl<X, A, B> Functor<A, B> for CFnKind<X>
-    where
-        X: 'static,
-        A: 'static,
-        B: 'static, // B must be 'static for CFn<X,B> which is Self::Of<B>
-    {
-        fn map(input: Self::Of<A>, func: impl FnMut(A) -> B + Clone + 'static) -> Self::Of<B> {
-            // input is CFn<X, A>
-            // func is A -> B
-            // result is CFn<X, B>
-            // To create a new CFn, the captured 'func' needs to be Clone if 'input' is called multiple times.
-            CFn::new(move |x: X| func.clone()(input.call(x))) // func.clone() for new CFn
         }
     }
 
@@ -136,6 +117,6 @@ pub mod kind {
 
 // Directly export Kind-based Functor
 pub use kind::Functor; // Renamed from hkt to kind
-                       // Note: CFnKind and CFnOnceKind are defined in kind_based::kind
+                       // Note: RcFnKind and CFnOnceKind are defined in kind_based::kind
                        // and Functor implementations for them are in the kind module above.
                        // This re-export makes `crate::functor::Functor` point to the Kind-based one.

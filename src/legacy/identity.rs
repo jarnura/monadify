@@ -1,9 +1,9 @@
 // Content from the original classic module in src/identity.rs
-use crate::function::CFn;
+use crate::function::RcFn;
 use crate::legacy::applicative::Applicative;
 use crate::legacy::apply::Apply;
 use crate::legacy::functor::Functor;
-use crate::legacy::monad::{Bind, Monad}; // CFn is not part of legacy/hkt split
+use crate::legacy::monad::{Bind, Monad};
 
 /// Legacy version of the `Identity` monad.
 ///
@@ -28,8 +28,8 @@ impl<A> Functor<A> for Identity<A> {
 
 impl<A: 'static> Apply<A> for Identity<A> {
     type Apply<T> = Identity<T>;
-    type Fnn<T, U> = CFn<T, U>;
-    fn apply<B>(self, i: Identity<Self::Fnn<A, B>>) -> Identity<B>
+    type Fnn<T, U> = RcFn<T, U>;
+    fn apply<B>(self, i: Identity<RcFn<A, B>>) -> Identity<B>
     where
         Self: Sized,
     {

@@ -32,9 +32,9 @@ use core::convert::identity;
 // NOTE: `lift_a1_rc` is the expected export name. The implementer may choose a
 // different sibling name (e.g. a generic `lift_a1` overload taking `RcFn`). The
 // assertion in the test below pins the VALUE, not the name.
-use monadify::applicative::kind::{lift_a1, lift_a1_rc, Applicative};
+use monadify::applicative::kind::{lift_a1, Applicative};
 use monadify::apply::kind::Apply;
-use monadify::function::{CFn, CFnOnce, RcFn};
+use monadify::function::{CFnOnce, RcFn};
 use monadify::functor::kind::Functor;
 use monadify::kind_based::kind::{RcFnKind, VecKind};
 use monadify::monad::kind::{Bind, Monad};
@@ -204,8 +204,8 @@ mod rcfn_kind_applicative_laws {
         let env_val: Env = 11;
         let v: RcFn<Env, i32> = RcFn::new(|env: Env| env + 100); // v(11) == 111
 
-        let id_cfn = CFn::new(identity::<i32>);
-        let pure_id: RcFn<Env, CFn<i32, i32>> = RcFnKind::<Env>::pure(id_cfn);
+        let id_rcfn = RcFn::new(identity::<i32>);
+        let pure_id: RcFn<Env, RcFn<i32, i32>> = RcFnKind::<Env>::pure(id_rcfn);
 
         let applied = RcFnKind::<Env>::apply(v.clone(), pure_id);
 
@@ -222,8 +222,10 @@ mod rcfn_kind_applicative_laws {
         let x: i32 = 10;
         let f = |val: i32| val * 2;
 
-        let lhs =
-            RcFnKind::<Env>::apply(RcFnKind::<Env>::pure(x), RcFnKind::<Env>::pure(CFn::new(f)));
+        let lhs = RcFnKind::<Env>::apply(
+            RcFnKind::<Env>::pure(x),
+            RcFnKind::<Env>::pure(RcFn::new(f)),
+        );
         let rhs: RcFn<Env, i32> = RcFnKind::<Env>::pure(f(x)); // pure(20)
 
         assert_eq!(lhs.call(env_val), rhs.call(env_val));
@@ -241,11 +243,11 @@ mod rcfn_kind_applicative_laws {
     fn cfn_clonable_rcfn_kind_applicative_law_composition() {
         // w: RcFn<Env, i32> — value reader: w(env) = env * 2
         let w: RcFn<Env, i32> = RcFn::new(|env: Env| env * 2);
-        // v: RcFn<Env, CFn<i32, i32>> — first function reader: v(env)(x) = x + env
-        let v: RcFn<Env, CFn<i32, i32>> = RcFn::new(|env: Env| CFn::new(move |x: i32| x + env));
-        // u: RcFn<Env, CFn<i32, String>> — second function reader: u(env)(y) = (y * env).to_string()
-        let u: RcFn<Env, CFn<i32, String>> =
-            RcFn::new(|env: Env| CFn::new(move |y: i32| (y * env).to_string()));
+        // v: RcFn<Env, RcFn<i32, i32>> — first function reader: v(env)(x) = x + env
+        let v: RcFn<Env, RcFn<i32, i32>> = RcFn::new(|env: Env| RcFn::new(move |x: i32| x + env));
+        // u: RcFn<Env, RcFn<i32, String>> — second function reader: u(env)(y) = (y * env).to_string()
+        let u: RcFn<Env, RcFn<i32, String>> =
+            RcFn::new(|env: Env| RcFn::new(move |y: i32| (y * env).to_string()));
 
         // apply(apply(w, v), u) — right-associated: u <*> (v <*> w)
         let inner: RcFn<Env, i32> = RcFnKind::<Env>::apply(w.clone(), v.clone());
@@ -272,19 +274,19 @@ mod rcfn_kind_applicative_laws {
 
         let y_val: A = 10;
 
-        // u: an RcFn<Env, CFn<A,B>> that always returns the same concrete CFn.
+        // u: an RcFn<Env, RcFn<A,B>> that always returns the same concrete RcFn.
         // Because RcFn is Clone, we can share `u` between lhs and rhs.
-        let u: RcFn<Env, CFn<A, B>> =
-            RcFn::new(move |_env: Env| CFn::new(|val: A| format!("val:{}", val)));
+        let u: RcFn<Env, RcFn<A, B>> =
+            RcFn::new(move |_env: Env| RcFn::new(|val: A| format!("val:{}", val)));
 
         let pure_y: RcFn<Env, A> = RcFnKind::<Env>::pure(y_val);
 
         // LHS: apply(pure(y), u)  — Apply<A, B>
         let lhs = RcFnKind::<Env>::apply(pure_y, u.clone());
 
-        // RHS: apply(u, pure(|f_fn| f_fn(y)))  — Apply<CFn<A,B>, B>
-        let interchange = CFn::new(move |f_fn: CFn<A, B>| f_fn.call(y_val));
-        let pure_interchange: RcFn<Env, CFn<CFn<A, B>, B>> = RcFnKind::<Env>::pure(interchange);
+        // RHS: apply(u, pure(|f_fn| f_fn(y)))  — Apply<RcFn<A,B>, B>
+        let interchange = RcFn::new(move |f_fn: RcFn<A, B>| f_fn.call(y_val));
+        let pure_interchange: RcFn<Env, RcFn<RcFn<A, B>, B>> = RcFnKind::<Env>::pure(interchange);
         let rhs = RcFnKind::<Env>::apply(u, pure_interchange);
 
         assert_eq!(lhs.call(env_val), rhs.call(env_val));
@@ -433,7 +435,7 @@ mod rcfn_kind_monad_laws {
 fn cfn_clonable_vec_lift_a1_rc_reenabled() {
     let fa: Vec<i32> = vec![1, 2, 3];
     // 1 % 2 == 1 => false, 2 % 2 == 0 => true, 3 % 2 == 1 => false
-    let result: Vec<bool> = lift_a1_rc::<VecKind, i32, bool, _>(|x: i32| x % 2 == 0, fa);
+    let result: Vec<bool> = lift_a1::<VecKind, i32, bool, _>(|x: i32| x % 2 == 0, fa);
     assert_eq!(result, vec![false, true, false]);
 }
 

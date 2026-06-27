@@ -1,7 +1,7 @@
 use monadify::apply::kind::{apply_first, apply_second, lift2, lift3};
 use monadify::fn2;
 use monadify::fn3;
-use monadify::function::CFn;
+use monadify::function::RcFn;
 use monadify::kind_based::kind::{OptionKind, ResultKind, VecKind};
 
 type TestError = String;
@@ -141,8 +141,8 @@ fn apply_second_result_both_ok() {
 fn cfn_forward_compose_shr() {
     // f: i32 -> String, g: String -> usize
     // f >> g  should be  i32 -> usize
-    let f = CFn::new(|x: i32| x.to_string());
-    let g = CFn::new(|s: String| s.len());
+    let f = RcFn::new(|x: i32| x.to_string());
+    let g = RcFn::new(|s: String| s.len());
     let fg = f >> g;
     assert_eq!(fg.call(42), 2); // "42".len() == 2
     assert_eq!(fg.call(100), 3); // "100".len() == 3
@@ -152,8 +152,8 @@ fn cfn_forward_compose_shr() {
 fn cfn_backward_compose_shl() {
     // g: String -> usize, f: i32 -> String
     // g << f  should be  i32 -> usize
-    let f = CFn::new(|x: i32| x.to_string());
-    let g = CFn::new(|s: String| s.len());
+    let f = RcFn::new(|x: i32| x.to_string());
+    let g = RcFn::new(|s: String| s.len());
     let fg = g << f;
     assert_eq!(fg.call(42), 2);
     assert_eq!(fg.call(1000), 4); // "1000".len() == 4
@@ -162,8 +162,8 @@ fn cfn_backward_compose_shl() {
 #[test]
 fn cfn_compose_identity_left() {
     // id >> f == f
-    let f = CFn::new(|x: i32| x * 2);
-    let id = CFn::new(|x: i32| x);
+    let f = RcFn::new(|x: i32| x * 2);
+    let id = RcFn::new(|x: i32| x);
     let composed = id >> f;
     assert_eq!(composed.call(5), 10);
 }
@@ -171,17 +171,17 @@ fn cfn_compose_identity_left() {
 #[test]
 fn cfn_compose_identity_right() {
     // f >> id == f
-    let f = CFn::new(|x: i32| x * 2);
-    let id = CFn::new(|x: i32| x);
+    let f = RcFn::new(|x: i32| x * 2);
+    let id = RcFn::new(|x: i32| x);
     let composed = f >> id;
     assert_eq!(composed.call(5), 10);
 }
 
 #[test]
 fn cfn_compose_three_functions() {
-    let f = CFn::new(|x: i32| x + 1);
-    let g = CFn::new(|x: i32| x * 2);
-    let h = CFn::new(|x: i32| x.to_string());
+    let f = RcFn::new(|x: i32| x + 1);
+    let g = RcFn::new(|x: i32| x * 2);
+    let h = RcFn::new(|x: i32| x.to_string());
     // (f >> g) >> h
     let fgh = (f >> g) >> h;
     // (3 + 1) * 2 = 8 → "8"

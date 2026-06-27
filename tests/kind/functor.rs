@@ -1,7 +1,7 @@
-use monadify::function::{CFn, CFnOnce};
+use monadify::function::{CFnOnce, RcFn};
 use monadify::functor::kind::Functor; // Changed hkt to kind
 use monadify::identity::{Identity, IdentityKind}; // Changed IdentityHKTMarker to IdentityKind
-use monadify::kind_based::kind::{CFnKind, CFnOnceKind, OptionKind, ResultKind, VecKind}; // ...HKTMarker to ...Kind
+use monadify::kind_based::kind::{CFnOnceKind, OptionKind, RcFnKind, ResultKind, VecKind};
 use monadify::transformers::reader::{ReaderT, ReaderTKind}; // Changed ReaderTHKTMarker to ReaderTKind
                                                             // Kind1 import might be needed if supertraits are checked explicitly, but Functor itself implies Kind1.
 
@@ -269,49 +269,46 @@ pub mod vec_kind_functor_laws {
     }
 }
 
-pub mod cfn_kind_functor_laws {
-    // Renamed module
+pub mod rcfn_kind_functor_laws {
     use super::*;
-    type Env = i32; // Common environment type for these tests
+    type Env = i32;
 
-    // Identity law: CFnKind::map(cfn, |x| x) == cfn
+    // Identity law: RcFnKind::map(rcfn, |x| x) == rcfn
     #[test]
-    fn cfn_kind_functor_identity() {
-        // Renamed test
+    fn rcfn_kind_functor_identity() {
         let env_val: Env = 5;
-        let cfn_creator = || CFn::new(move |env: Env| env * 2); // Example CFn: 5 -> 10
+        let rcfn_creator = || RcFn::new(move |env: Env| env * 2);
 
         let identity_fn = clone_fn_map(|x: i32| x);
-        let mapped_cfn: CFn<Env, i32> = CFnKind::<Env>::map(cfn_creator(), identity_fn); // Renamed Marker
+        let mapped_rcfn: RcFn<Env, i32> = RcFnKind::<Env>::map(rcfn_creator(), identity_fn);
 
-        assert_eq!(mapped_cfn.call(env_val), cfn_creator().call(env_val));
-        assert_eq!(mapped_cfn.call(env_val), 10);
+        assert_eq!(mapped_rcfn.call(env_val), rcfn_creator().call(env_val));
+        assert_eq!(mapped_rcfn.call(env_val), 10);
     }
 
-    // Composition law: CFnKind::map(cfn, |x| g(f(x))) == CFnKind::map(CFnKind::map(cfn, f), g)
+    // Composition law: RcFnKind::map(rcfn, |x| g(f(x))) == RcFnKind::map(RcFnKind::map(rcfn, f), g)
     #[test]
-    fn cfn_kind_functor_composition() {
-        // Renamed test
+    fn rcfn_kind_functor_composition() {
         let env_val: Env = 3;
-        let cfn_creator = || CFn::new(move |env: Env| env + 1); // Example CFn: 3 -> 4
+        let rcfn_creator = || RcFn::new(move |env: Env| env + 1);
 
         let f = clone_fn_map(|x: i32| (x * x) as f64);
         let g = clone_fn_map(|y: f64| y.to_string());
 
         let f_clone_for_composed = f.clone();
         let g_clone_for_composed = g.clone();
-        let composed_map_cfn: CFn<Env, String> = CFnKind::<Env>::map(cfn_creator(), move |x| {
+        let composed_map_rcfn: RcFn<Env, String> = RcFnKind::<Env>::map(rcfn_creator(), move |x| {
             g_clone_for_composed.clone()(f_clone_for_composed.clone()(x))
-        }); // Renamed Marker
+        });
 
-        let mapped_f_cfn: CFn<Env, f64> = CFnKind::<Env>::map(cfn_creator(), f); // Renamed Marker
-        let sequential_map_cfn: CFn<Env, String> = CFnKind::<Env>::map(mapped_f_cfn, g); // Renamed Marker
+        let mapped_f_rcfn: RcFn<Env, f64> = RcFnKind::<Env>::map(rcfn_creator(), f);
+        let sequential_map_rcfn: RcFn<Env, String> = RcFnKind::<Env>::map(mapped_f_rcfn, g);
 
         assert_eq!(
-            composed_map_cfn.call(env_val),
-            sequential_map_cfn.call(env_val)
+            composed_map_rcfn.call(env_val),
+            sequential_map_rcfn.call(env_val)
         );
-        assert_eq!(composed_map_cfn.call(env_val), "16".to_string());
+        assert_eq!(composed_map_rcfn.call(env_val), "16".to_string());
     }
 }
 

@@ -102,7 +102,7 @@ pub fn map_vec(c: &mut Criterion) {
 }
 
 use monadify::apply::Apply;
-use monadify::function::CFn;
+use monadify::function::RcFn;
 #[cfg(feature = "legacy")]
 use monadify::legacy::apply::Apply as LegacyApply;
 #[cfg(feature = "legacy")]
@@ -124,7 +124,7 @@ pub fn apply_option(c: &mut Criterion) {
         val_opt_ref,
         |b, &val_s| {
             b.iter(|| {
-                let func_opt: Option<CFn<i32, i32>> = Some(CFn::new(|x: i32| x + 1));
+                let func_opt: Option<RcFn<i32, i32>> = Some(RcFn::new(|x: i32| x + 1));
                 OptionKind::apply(val_s, func_opt) // Call on marker type
             })
         },
@@ -153,7 +153,7 @@ pub fn apply_option(c: &mut Criterion) {
         val_opt_ref,
         |b, &val_s| {
             b.iter(|| {
-                let func_opt: Option<CFn<i32, i32>> = Some(CFn::new(|x: i32| x + 1));
+                let func_opt: Option<RcFn<i32, i32>> = Some(RcFn::new(|x: i32| x + 1));
                 <Option<i32> as LegacyApply<i32>>::apply(val_s, func_opt) // Call as instance method
             })
         },
@@ -209,7 +209,7 @@ pub fn apply_result(c: &mut Criterion) {
         val_res_ref,
         |b, val_s_ref: &Result<i32, String>| {
             b.iter(|| {
-                let func_res: Result<CFn<i32, i32>, String> = Ok(CFn::new(|x: i32| x + 1));
+                let func_res: Result<RcFn<i32, i32>, String> = Ok(RcFn::new(|x: i32| x + 1));
                 ResultKind::<String>::apply(val_s_ref.clone(), func_res) // Call on marker type
             })
         },
@@ -238,7 +238,7 @@ pub fn apply_result(c: &mut Criterion) {
         val_res_ref,
         |b, val_s_ref: &Result<i32, String>| {
             b.iter(|| {
-                let func_res: Result<CFn<i32, i32>, String> = Ok(CFn::new(|x: i32| x + 1));
+                let func_res: Result<RcFn<i32, i32>, String> = Ok(RcFn::new(|x: i32| x + 1));
                 <Result<i32, String> as LegacyApply<i32>>::apply(val_s_ref.clone(), func_res)
                 // Call as instance method
             })
@@ -302,7 +302,7 @@ pub fn apply_vec(c: &mut Criterion) {
         val_vec_ref,
         |b, val_s_vec_ref: &Vec<i32>| {
             b.iter(|| {
-                let func_vec: Vec<CFn<i32, i32>> = vec![CFn::new(|x: i32| x + 1)];
+                let func_vec: Vec<RcFn<i32, i32>> = vec![RcFn::new(|x: i32| x + 1)];
                 VecKind::apply(val_s_vec_ref.clone(), func_vec) // Call on marker type
             })
         },
@@ -335,7 +335,7 @@ pub fn apply_vec(c: &mut Criterion) {
         val_vec_ref,
         |b, val_s_vec_ref: &Vec<i32>| {
             b.iter(|| {
-                let func_vec: Vec<CFn<i32, i32>> = vec![CFn::new(|x: i32| x + 1)];
+                let func_vec: Vec<RcFn<i32, i32>> = vec![RcFn::new(|x: i32| x + 1)];
                 <Vec<i32> as LegacyApply<i32>>::apply(val_s_vec_ref.clone(), func_vec)
                 // Call as instance method
             })
