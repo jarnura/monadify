@@ -45,7 +45,7 @@ use super::{
     arb_identity_i32, arb_linear_closure_params, arb_result_i32_string, linear_cfn, linear_fn,
 };
 use monadify::apply::kind::Apply;
-use monadify::function::CFn;
+use monadify::function::RcFn;
 use monadify::identity::{Identity, IdentityKind};
 use monadify::kind_based::kind::{OptionKind, ResultKind};
 use proptest::prelude::*;
@@ -70,8 +70,8 @@ proptest! {
         f_present in any::<bool>(),
         g_present in any::<bool>(),
     ) {
-        let v: Option<CFn<i32, i32>> = if f_present { Some(linear_cfn(fa, fb)) } else { None };
-        let u: Option<CFn<i32, i32>> = if g_present { Some(linear_cfn(ga, gb)) } else { None };
+        let v: Option<RcFn<i32, i32>> = if f_present { Some(linear_cfn(fa, fb)) } else { None };
+        let u: Option<RcFn<i32, i32>> = if g_present { Some(linear_cfn(ga, gb)) } else { None };
 
         // LHS: u <*> (v <*> w) == apply(apply(w, v), u)
         let lhs = OptionKind::apply(OptionKind::apply(w, v), u);
@@ -106,9 +106,9 @@ proptest! {
         ev in ".*",
         eu in ".*",
     ) {
-        let v: Result<CFn<i32, i32>, TestError> =
+        let v: Result<RcFn<i32, i32>, TestError> =
             if f_ok { Ok(linear_cfn(fa, fb)) } else { Err(ev.clone()) };
-        let u: Result<CFn<i32, i32>, TestError> =
+        let u: Result<RcFn<i32, i32>, TestError> =
             if g_ok { Ok(linear_cfn(ga, gb)) } else { Err(eu.clone()) };
 
         // LHS: u <*> (v <*> w) == apply(apply(w, v), u)

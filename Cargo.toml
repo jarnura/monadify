@@ -5,7 +5,7 @@ resolver = "2"
 [package]
 name = "monadify"
 description = "A library for functional programming abstractions in Rust, focusing on Monads, Functors, Applicatives, and related concepts."
-version = "0.1.1"
+version = "0.2.0"
 authors = ["jarnura"]
 edition = "2021"
 rust-version = "1.66" # Minimum supported Rust version

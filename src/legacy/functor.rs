@@ -1,5 +1,6 @@
 // Content from the original classic module in src/functor.rs
-use crate::function::{CFn, CFnOnce};
+use crate::function::{CFnOnce, RcFn};
+use std::rc::Rc;
 
 /// Represents a type constructor that can be mapped over.
 ///
@@ -9,8 +10,8 @@ use crate::function::{CFn, CFnOnce};
 /// for working with "boxed" or "contextual" values.
 ///
 /// Implementors of `Functor` must satisfy two laws:
-/// 1. **Identity**: `map(x, |a| a) == x` (more precisely, `<Type<A> as Functor<A>>::map(x, |a| a) == x`)
-/// 2. **Composition**: `<Type<B> as Functor<B>>::map(<Type<A> as Functor<A>>::map(x, f), g) == <Type<A> as Functor<A>>::map(x, |a| g(f(a)))`
+/// 1. **Identity**: `map(x, |a| a) == x`
+/// 2. **Composition**: `map(map(x, f), g) == map(x, |a| g(f(a)))`
 ///
 /// The associated type `Functor<T>` represents the generic structure of the functor
 /// itself, allowing `map` to transform the inner type while preserving the structure.
@@ -57,14 +58,15 @@ impl<A: 'static> Functor<A> for Vec<A> {
     }
 }
 
-impl<X: 'static, A: 'static> Functor<A> for CFn<X, A> {
-    type Functor<T> = CFnOnce<X, T>;
+impl<X: 'static, A: 'static> Functor<A> for RcFn<X, A> {
+    type Functor<T> = RcFn<X, T>;
 
-    fn map<B, Func>(self, mut f: Func) -> Self::Functor<B>
+    fn map<B, Func>(self, func: Func) -> RcFn<X, B>
     where
-        Func: FnMut(A) -> B + 'static,
+        Func: FnMut(A) -> B + Clone + 'static,
     {
-        CFnOnce::new(move |x: X| f(self.call(x)))
+        let inner = self.0.clone();
+        RcFn(Rc::new(move |x: X| func.clone()(inner(x))))
     }
 }
 
@@ -77,4 +79,4 @@ impl<X: 'static, A: 'static> Functor<A> for CFnOnce<X, A> {
     {
         CFnOnce::new(move |x: X| f(self.call_once(x)))
     }
-} // Closing for impl Functor for CFnOnce
+}

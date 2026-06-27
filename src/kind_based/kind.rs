@@ -16,7 +16,7 @@
 //! the marker's `Of<Arg>` GAT, they can refer to the concrete type
 //! (e.g., `Option<String>`, `Vec<i32>`).
 
-use crate::function::{CFn, CFnOnce, RcFn};
+use crate::function::{CFnOnce, RcFn};
 use std::marker::PhantomData;
 
 /// Represents a type constructor, often referred to as a Kind.
@@ -79,16 +79,6 @@ impl<E> Kind for ResultKind<E> {
     type Of<Arg> = Result<Arg, E>;
 }
 
-/// Kind Marker for `CFn<X, _>`. `X` is the fixed input type of the function.
-///
-/// Implements [`Kind`] such that `CFnKind<X>::Of<Output>` resolves to `CFn<X, Output>`.
-#[derive(Default)] // CFnKind itself doesn't need Debug, Clone etc. unless used directly in ways that require it.
-pub struct CFnKind<X>(PhantomData<X>);
-
-impl<X> Kind for CFnKind<X> {
-    type Of<Output> = CFn<X, Output>;
-}
-
 /// Kind Marker for `CFnOnce<X, _>`. `X` is the fixed input type of the function.
 ///
 /// Implements [`Kind`] such that `CFnOnceKind<X>::Of<Output>` resolves to `CFnOnce<X, Output>`.
@@ -103,7 +93,7 @@ impl<X> Kind for CFnOnceKind<X> {
 ///
 /// Implements [`Kind`] such that `RcFnKind<X>::Of<Output>` resolves to `RcFn<X, Output>`.
 ///
-/// Unlike [`CFnKind<X>`], the resolved type `RcFn<X, Output>` is `Clone` (O(1) `Rc` bump),
+/// The resolved type `RcFn<X, Output>` is `Clone` (O(1) `Rc` bump),
 /// which enables `Applicative` laws over `VecKind` and `mdo!` do-notation blocks.
 #[derive(Default)]
 pub struct RcFnKind<X>(PhantomData<X>);

@@ -1,7 +1,7 @@
 #![cfg(all(test, feature = "legacy"))] // Ensure these run only when 'legacy' is active
 
 // These imports will need to point to legacy versions.
-use monadify::function::CFn;
+use monadify::function::RcFn;
 use monadify::legacy::applicative::Applicative;
 use monadify::legacy::apply::Apply;
 use monadify::legacy::functor::Functor;
@@ -22,12 +22,12 @@ fn test_identity_functor_map() {
 #[test]
 fn test_identity_apply() {
     let id_val = Identity(5);
-    let id_fn: Identity<CFn<i32, i32>> = Identity(CFn::new(|x| x * 2));
+    let id_fn: Identity<RcFn<i32, i32>> = Identity(RcFn::new(|x| x * 2));
     let result = <Identity<i32> as Apply<i32>>::apply(id_val, id_fn);
     assert_eq!(result, Identity(10));
 
     let id_str_val = Identity(String::from("test"));
-    let id_str_fn: Identity<CFn<String, usize>> = Identity(CFn::new(|s: String| s.len()));
+    let id_str_fn: Identity<RcFn<String, usize>> = Identity(RcFn::new(|s: String| s.len()));
     let result_str = <Identity<String> as Apply<String>>::apply(id_str_val, id_str_fn);
     assert_eq!(result_str, Identity(4));
 }

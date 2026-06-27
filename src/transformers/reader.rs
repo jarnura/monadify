@@ -101,7 +101,7 @@ pub mod kind {
 
     use crate::applicative::kind as applicative_kind; // Renamed hkt to kind
     use crate::apply::kind as apply_kind; // Renamed hkt to kind
-    use crate::function::CFn; // For Apply's function container type
+    use crate::function::RcFn; // For Apply's function container type
     use crate::functor::kind as functor_kind; // Renamed hkt to kind
     use crate::identity::kind::IdentityKind;
     use crate::kind_based::kind::{Kind, Kind1}; // Changed HKT, HKT1 to Kind, Kind1
@@ -206,21 +206,21 @@ pub mod kind {
         MKind: apply_kind::Apply<A, B> + Kind1 + 'static, // Inner MKind must be Apply. HKT1 to Kind1
         A: 'static,
         B: 'static,
-        MKind::Of<A>: 'static,         // M<A>. Applied to Of
-        MKind::Of<B>: 'static,         // M<B>. Applied to Of
-        MKind::Of<CFn<A, B>>: 'static, // M<CFn<A,B>>. Applied to Of
+        MKind::Of<A>: 'static,          // M<A>. Applied to Of
+        MKind::Of<B>: 'static,          // M<B>. Applied to Of
+        MKind::Of<RcFn<A, B>>: 'static, // M<RcFn<A,B>>.
     {
         /// Applies a wrapped function within `ReaderT` to a wrapped value within `ReaderT`.
         /// Both computations share the same environment `R`. The application happens within `MKind`.
         fn apply(
             value_container: ReaderT<R, MKind, A>,
-            function_container: ReaderT<R, MKind, CFn<A, B>>,
+            function_container: ReaderT<R, MKind, RcFn<A, B>>,
         ) -> ReaderT<R, MKind, B> {
             let value_run = value_container.run_reader_t.clone();
             let function_run = function_container.run_reader_t.clone();
             ReaderT::new(move |env: R| {
-                let m_val: MKind::Of<A> = value_run(env.clone()); // Applied to Of
-                let m_func: MKind::Of<CFn<A, B>> = function_run(env); // Applied to Of
+                let m_val: MKind::Of<A> = value_run(env.clone());
+                let m_func: MKind::Of<RcFn<A, B>> = function_run(env);
                 MKind::apply(m_val, m_func) // Delegate to MKind's apply
             })
         }

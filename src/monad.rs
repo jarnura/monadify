@@ -43,9 +43,9 @@ pub mod kind {
 
     use crate::applicative::kind::Applicative; // Kind-based Applicative
     use crate::apply::kind::Apply; // Kind-based Apply
-    use crate::function::{CFn, CFnOnce, RcFn};
+    use crate::function::{CFnOnce, RcFn};
     use crate::kind_based::kind::{
-        CFnKind, CFnOnceKind, Kind, Kind1, OptionKind, RcFnKind, ResultKind, VecKind,
+        CFnOnceKind, Kind, Kind1, OptionKind, RcFnKind, ResultKind, VecKind,
     };
     use std::rc::Rc;
 
@@ -184,43 +184,6 @@ pub mod kind {
         }
     }
 
-    // Bind for CFnKind<R> (Kleisli composition for R -> _)
-    // input: Self::Of<A> which is CFn<R, A>
-    // func: A -> Self::Of<B> which is A -> CFn<R, B> (a function producing a function)
-    // result: Self::Of<B> which is CFn<R, B> (a new function R -> B)
-    impl<R, A, B: 'static> Bind<A, B> for CFnKind<R>
-    // Changed CFnHKTMarker to CFnKind
-    where
-        R: 'static + Clone, // Clone for `r.clone()`
-        A: 'static,
-        Self: Apply<A, B>,
-        Self: Kind<Of<A> = CFn<R, A>>, // Changed HKT to Kind, Applied to Of
-        Self: Kind<Of<B> = CFn<R, B>>, // Changed HKT to Kind, Applied to Of
-    {
-        /// Implements Kleisli composition for functions `R -> A` and `A -> (R -> B)`.
-        ///
-        /// Given `input_fn: R -> A` and `func: A -> (R -> B)`,
-        /// produces a new function `R -> B`.
-        /// The new function, when called with `r: R`:
-        /// 1. Calls `input_fn(r)` to get `a: A`.
-        /// 2. Calls `func(a)` to get `output_fn: R -> B`.
-        /// 3. Calls `output_fn(r)` to get `b: B`.
-        fn bind(
-            input: Self::Of<A>,
-            func: impl FnMut(A) -> Self::Of<B> + Clone + 'static,
-        ) -> Self::Of<B> {
-            // Changed Applied to Of
-            let concrete_input_fn = input;
-
-            CFn::new(move |r: R| {
-                let a_val = concrete_input_fn.call(r.clone());
-                let mut func_clone = func.clone(); // Clone for this call, as CFn::new needs Fn
-                let cfn_r_b = func_clone(a_val); // cfn_r_b is CFn<R, B>
-                cfn_r_b.call(r.clone())
-            })
-        }
-    }
-
     // Bind for RcFnKind<R> (Kleisli composition for R -> _)
     // input: RcFn<R, A>; func: A -> RcFn<R, B>; result: RcFn<R, B>
     impl<R, A, B: 'static> Bind<A, B> for RcFnKind<R>
@@ -262,7 +225,7 @@ pub mod kind {
     {
         /// Implements Kleisli composition for functions `R -> A` (once) and `A -> (R -> B)` (once).
         ///
-        /// Similar to `CFnKind::bind`, but for `CFnOnce`.
+        /// Implements Kleisli composition for `CFnOnce`: analogous to `RcFnKind::bind` but for single-use closures.
         /// The resulting function `R -> B` can also only be called once.
         fn bind(
             input: Self::Of<A>,
@@ -314,26 +277,6 @@ pub mod kind {
         }
     }
 
-    impl<R, A> Monad<A> for CFnKind<R>
-    // Changed CFnHKTMarker to CFnKind
-    where
-        R: 'static + Clone,
-        A: 'static + Clone, // From Applicative supertrait for CFnKind<R>
-    {
-        /// Flattens `CFn<R, CFn<R, A>>` to `CFn<R, A>`.
-        ///
-        /// This is achieved by using `bind` with the identity function `|ma: CFn<R,A>| ma`.
-        /// Given `mma: R -> (R -> A)`, produces `R -> A`.
-        /// The new function, when called with `r: R`:
-        /// 1. Calls `mma(r)` to get `ma: R -> A`.
-        /// 2. Calls `ma(r)` to get `a: A`.
-        fn join(mma: Self::Of<Self::Of<A>>) -> Self::Of<A> {
-            // mma is CFn<R, CFn<R,A>>. Changed Applied to Of
-            // Bind<Self::Of<A>, A> means Bind<CFn<R,A>, A>
-            <Self as Bind<Self::Of<A>, A>>::bind(mma, |ma: Self::Of<A>| ma) // Changed Applied to Of
-        }
-    }
-
     impl<R, A> Monad<A> for RcFnKind<R>
     where
         R: 'static + Clone,
@@ -343,7 +286,7 @@ pub mod kind {
         ///
         /// Implemented via `bind` with the identity function `|ma: RcFn<R,A>| ma`.
         /// Because `RcFn` is `Clone`, the inner type `A = RcFn<R, A>` satisfies
-        /// the `Clone` constraint that prevented this from working with `CFnKind`.
+        /// the `Clone` constraint (unlike the old `Box`-backed approach which blocked this).
         fn join(mma: Self::Of<Self::Of<A>>) -> Self::Of<A> {
             <Self as Bind<Self::Of<A>, A>>::bind(mma, |ma: Self::Of<A>| ma)
         }
@@ -357,7 +300,7 @@ pub mod kind {
     {
         /// Flattens `CFnOnce<R, CFnOnce<R, A>>` to `CFnOnce<R, A>`.
         ///
-        /// Similar to `CFnKind::join`, but for `CFnOnce`.
+        /// Analogous to `RcFnKind::join`, but for single-use `CFnOnce` closures.
         fn join(mma: Self::Of<Self::Of<A>>) -> Self::Of<A> {
             // mma is CFnOnce<R, CFnOnce<R,A>>. Changed Applied to Of
             <Self as Bind<Self::Of<A>, A>>::bind(mma, |ma: Self::Of<A>| ma) // Changed Applied to Of

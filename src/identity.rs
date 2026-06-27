@@ -43,7 +43,7 @@ pub mod kind {
 
     use crate::applicative::kind as applicative_kind; // Renamed hkt to kind
     use crate::apply::kind as apply_kind; // Renamed hkt to kind
-    use crate::function::CFn;
+    use crate::function::RcFn;
     use crate::functor::kind as functor_kind; // Renamed hkt to kind
     use crate::kind_based::kind::Kind; // Changed HKT to Kind
     use crate::monad::kind as monad_kind; // Renamed hkt to kind // For Apply's function container
@@ -82,15 +82,14 @@ pub mod kind {
 
     // Kind-based Apply for IdentityKind
     impl<A, B> apply_kind::Apply<A, B> for IdentityKind
-    // Changed IdentityHKTMarker to IdentityKind
     where
         A: 'static, // Required by Apply trait definition
         B: 'static, // Required by Apply trait definition
     {
-        /// Applies a wrapped function `Identity<CFn<A, B>>` to a wrapped value `Identity<A>`.
+        /// Applies a wrapped function `Identity<RcFn<A, B>>` to a wrapped value `Identity<A>`.
         fn apply(
             value_container: Identity<A>,
-            function_container: Identity<CFn<A, B>>,
+            function_container: Identity<RcFn<A, B>>,
         ) -> Identity<B> {
             Identity(function_container.0.call(value_container.0))
         }
