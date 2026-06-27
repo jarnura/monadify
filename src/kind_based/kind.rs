@@ -16,7 +16,7 @@
 //! the marker's `Of<Arg>` GAT, they can refer to the concrete type
 //! (e.g., `Option<String>`, `Vec<i32>`).
 
-use crate::function::{CFn, CFnOnce};
+use crate::function::{CFn, CFnOnce, RcFn};
 use std::marker::PhantomData;
 
 /// Represents a type constructor, often referred to as a Kind.
@@ -97,6 +97,19 @@ pub struct CFnOnceKind<X>(PhantomData<X>);
 
 impl<X> Kind for CFnOnceKind<X> {
     type Of<Output> = CFnOnce<X, Output>;
+}
+
+/// Kind Marker for `RcFn<X, _>`. `X` is the fixed input type of the function.
+///
+/// Implements [`Kind`] such that `RcFnKind<X>::Of<Output>` resolves to `RcFn<X, Output>`.
+///
+/// Unlike [`CFnKind<X>`], the resolved type `RcFn<X, Output>` is `Clone` (O(1) `Rc` bump),
+/// which enables `Applicative` laws over `VecKind` and `mdo!` do-notation blocks.
+#[derive(Default)]
+pub struct RcFnKind<X>(PhantomData<X>);
+
+impl<X> Kind for RcFnKind<X> {
+    type Of<Output> = RcFn<X, Output>;
 }
 
 // --- Arity Markers ---

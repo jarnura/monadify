@@ -23,7 +23,12 @@ The library defines and implements the following core functional programming tra
 *   **`Choice`**: Extends `Profunctor`. Provides `left` and `right` for operating on sum types (`Result`).
     *   Implemented for `CFn<A, B>`.
 
-The library also includes `CFn` and `CFnOnce` wrappers for heap-allocated closures, and various helper functions and macros (e.g., `lift2`, `lift_a1`, `fn0!`, `fn1!`, `_1`, `_2`, `view`) for working with these abstractions. Optical structures like `Lens` and `Getter` (using `Profunctor` encoding) are also explored.
+The library also includes function wrappers for heap-allocated closures:
+- **`CFn<A, B>`**: A `Box`-backed, unique-ownership, non-`Clone` wrapper.
+- **`RcFn<A, B>`**: An `Rc`-backed, shared-ownership, `Clone`-able sibling that unblocks `lift_a1::<VecKind>` and enables `mdo!` over function monads. Cloning is O(1).
+- **`CFnOnce<A, B>`**: A `Box`-backed wrapper for once-callable closures (intentionally not `Clone`).
+
+The library also includes various helper functions and macros (e.g., `lift2`, `lift_a1`, `fn0!`, `fn1!`, `_1`, `_2`, `view`) for working with these abstractions. Optical structures like `Lens` and `Getter` (using `Profunctor` encoding) are also explored.
 
 ## Project Goals
 - To explore and understand monads and other functional patterns from a practical Rust implementation perspective.
@@ -112,7 +117,7 @@ Run with: `cargo run --example validation --features do-notation`
 
 **Limitations and notes**:
 - `pure` is a reserved free-call head inside `mdo!` blocks (rewritten to `Marker::pure`); use `::pure`-qualified or `.pure()` method syntax to bypass
-- `CFn` / `CFnOnce` unsupported (they are not `Clone`)
+- `CFn` / `CFnOnce` unsupported (not `Clone`); use `RcFn` instead for a `Clone`-able, shared-ownership function monad
 - At most one non-`Copy` external value per `mdo!` nesting level (closure capture constraint)
 
 See [`monadify::mdo`](https://docs.rs/monadify) documentation for full details.

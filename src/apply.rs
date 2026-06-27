@@ -14,11 +14,12 @@ pub mod kind {
     //! - `A`: The input type of the function `A -> B` and the type of value in `Self::Of<A>`.
     //! - `B`: The output type of the function `A -> B` and the type of value in `Self::Of<B>`.
 
-    use crate::function::{CFn, CFnOnce};
+    use crate::function::{CFn, CFnOnce, RcFn};
     use crate::functor::Functor; // Kind-based Functor
     use crate::kind_based::kind::{
-        CFnKind, CFnOnceKind, Kind, Kind1, OptionKind, ResultKind, VecKind,
+        CFnKind, CFnOnceKind, Kind, Kind1, OptionKind, RcFnKind, ResultKind, VecKind,
     };
+    use std::rc::Rc;
 
     /// Represents a Kind-encoded type that can apply a wrapped function to a wrapped value.
     ///
@@ -163,6 +164,99 @@ pub mod kind {
                 let val_a = value_container.call_once(x_val); // val_a is A
                 func_ab.call(val_a)
             })
+        }
+    }
+
+    // Apply for RcFnKind<X>
+    // The function container is RcFn<X, CFn<A,B>> (outer Rc-backed, inner CFn),
+    // mirroring CFnKind where the container is CFn<X, CFn<A,B>>.
+    impl<X, A, B> Apply<A, B> for RcFnKind<X>
+    where
+        X: 'static + Clone,
+        A: 'static,
+        B: 'static,
+        Self: Functor<A, B>,
+        Self: Kind<Of<A> = RcFn<X, A>>,
+        Self: Kind<Of<CFn<A, B>> = RcFn<X, CFn<A, B>>>,
+        Self: Kind<Of<B> = RcFn<X, B>>,
+    {
+        /// Applies an `RcFn<X, CFn<A,B>>` (a function from environment to a function
+        /// `A -> B`) to an `RcFn<X, A>` (a function from environment to `A`),
+        /// producing `RcFn<X, B>`.  This is the S combinator: `(f x)(g x)`.
+        fn apply(
+            value_container: Self::Of<A>,            // RcFn<X, A>
+            function_container: Self::Of<CFn<A, B>>, // RcFn<X, CFn<A,B>>
+        ) -> Self::Of<B> {
+            let f_rc = function_container.0.clone();
+            let v_rc = value_container.0.clone();
+            RcFn(Rc::new(move |x_val: X| {
+                let func_ab: CFn<A, B> = f_rc(x_val.clone());
+                let val_a: A = v_rc(x_val);
+                func_ab.call(val_a)
+            }))
+        }
+    }
+
+    /// A variant of [`Apply`] where the function container holds [`RcFn<A, B>`]
+    /// instead of [`CFn<A, B>`].
+    ///
+    /// This is needed to implement [`crate::applicative::kind::lift_a1_rc`], which
+    /// wraps a plain `A -> B` function in `RcFn` (not `CFn`) so that the resulting
+    /// value satisfies `T: Clone` — a requirement of `VecKind`'s `Applicative<T>`.
+    ///
+    /// Implemented for [`OptionKind`], [`ResultKind<E>`], and [`VecKind`].
+    pub trait ApplyRc<A, B>: Kind1 {
+        /// Applies a Kind-wrapped `RcFn<A, B>` to a Kind-wrapped `A`, producing `B`.
+        fn apply_rc(value: Self::Of<A>, func: Self::Of<RcFn<A, B>>) -> Self::Of<B>;
+    }
+
+    impl<A: 'static, B: 'static> ApplyRc<A, B> for OptionKind {
+        /// Applies `Option<RcFn<A,B>>` to `Option<A>`.
+        fn apply_rc(value: Self::Of<A>, func: Self::Of<RcFn<A, B>>) -> Self::Of<B> {
+            value.and_then(|val_a| func.map(|f| f.call(val_a)))
+        }
+    }
+
+    impl<A: 'static, B: 'static, E: 'static + Clone> ApplyRc<A, B> for ResultKind<E> {
+        /// Applies `Result<RcFn<A,B>, E>` to `Result<A, E>`.
+        fn apply_rc(value: Self::Of<A>, func: Self::Of<RcFn<A, B>>) -> Self::Of<B> {
+            value.and_then(|val_a| func.map(|f| f.call(val_a)))
+        }
+    }
+
+    impl<A: 'static + Clone, B: 'static> ApplyRc<A, B> for VecKind {
+        /// Applies `Vec<RcFn<A,B>>` to `Vec<A>`, producing the Cartesian product.
+        ///
+        /// Each `RcFn` in `func` is applied to every element of `value`.  Because
+        /// `RcFn` is `Clone`, iterating over `value` multiple times works without
+        /// additional allocation.
+        fn apply_rc(value: Self::Of<A>, func: Self::Of<RcFn<A, B>>) -> Self::Of<B> {
+            func.into_iter()
+                .flat_map(|f_fn| value.iter().map(move |val_a| f_fn.call(val_a.clone())))
+                .collect()
+        }
+    }
+
+    impl<X, A, B> ApplyRc<A, B> for RcFnKind<X>
+    where
+        X: 'static + Clone,
+        A: 'static,
+        B: 'static,
+    {
+        /// Applies `RcFn<X, RcFn<A,B>>` to `RcFn<X, A>`, producing `RcFn<X, B>`.
+        ///
+        /// This is the S-combinator (`apply_rc(v, f)(x) = f(x)(v(x))`) expressed
+        /// through `RcFn` wrappers at every layer.  Because both the outer carrier
+        /// and the inner function wrapper are `RcFn` (and therefore `Clone`), no
+        /// `Box`-to-`Rc` conversion is needed — both `Rc` handles are cheaply shared.
+        fn apply_rc(value: Self::Of<A>, func: Self::Of<RcFn<A, B>>) -> Self::Of<B> {
+            let f_rc = func.0.clone();
+            let v_rc = value.0.clone();
+            RcFn(Rc::new(move |x_val: X| {
+                let inner_fn: RcFn<A, B> = f_rc(x_val.clone());
+                let val_a: A = v_rc(x_val);
+                inner_fn.call(val_a)
+            }))
         }
     }
 

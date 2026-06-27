@@ -16,8 +16,11 @@ pub mod kind {
     //! It relies on the [`Kind1`] trait from `crate::kind_based::kind` to relate the
     //! marker `Self` to its concrete type application `Self::Of<T>`.
 
-    use crate::function::{CFn, CFnOnce};
-    use crate::kind_based::kind::{CFnKind, CFnOnceKind, Kind1, OptionKind, ResultKind, VecKind};
+    use crate::function::{CFn, CFnOnce, RcFn};
+    use crate::kind_based::kind::{
+        CFnKind, CFnOnceKind, Kind1, OptionKind, RcFnKind, ResultKind, VecKind,
+    };
+    use std::rc::Rc;
 
     /// Represents a type constructor that can be mapped over, using the Kind pattern.
     ///
@@ -94,6 +97,26 @@ pub mod kind {
             // result is CFn<X, B>
             // To create a new CFn, the captured 'func' needs to be Clone if 'input' is called multiple times.
             CFn::new(move |x: X| func.clone()(input.call(x))) // func.clone() for new CFn
+        }
+    }
+
+    // Functor impl for RcFnKind (maps over the output type of RcFn)
+    // A is the original output type, B is the new output type.
+    impl<X, A, B> Functor<A, B> for RcFnKind<X>
+    where
+        X: 'static,
+        A: 'static,
+        B: 'static,
+    {
+        /// Maps a function `A -> B` over the output of an `RcFn<X, A>`,
+        /// producing an `RcFn<X, B>`.
+        ///
+        /// The inner `Rc` is cloned (O(1)) to capture the original function in
+        /// the new closure. `func` is `Clone`-d on each invocation to satisfy
+        /// the `Fn` (not `FnMut`) requirement of `Rc<dyn Fn>`.
+        fn map(input: Self::Of<A>, func: impl FnMut(A) -> B + Clone + 'static) -> Self::Of<B> {
+            let inner = input.0.clone();
+            RcFn(Rc::new(move |x: X| func.clone()(inner(x))))
         }
     }
 

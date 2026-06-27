@@ -42,11 +42,12 @@ pub mod kind {
     //! this `monadify` library's `apply` takes `(value_context, function_context)`.
     //! The `lift_a1` function in this module demonstrates this pattern.
 
-    use crate::apply::kind::Apply; // Kind-based Apply
-    use crate::function::{CFn, CFnOnce};
+    use crate::apply::kind::{Apply, ApplyRc}; // Kind-based Apply
+    use crate::function::{CFn, CFnOnce, RcFn};
     use crate::kind_based::kind::{
-        CFnKind, CFnOnceKind, Kind, Kind1, OptionKind, ResultKind, VecKind,
+        CFnKind, CFnOnceKind, Kind, Kind1, OptionKind, RcFnKind, ResultKind, VecKind,
     };
+    use std::rc::Rc;
 
     /// Represents a Kind-encoded type that is an Applicative Functor.
     ///
@@ -152,6 +153,61 @@ pub mod kind {
         }
     }
 
+    // Applicative for RcFnKind<X> — generic Clone case.
+    // Lifts a value `T: Clone` into `RcFn<X, T>` which always returns `value.clone()`.
+    impl<X, T> Applicative<T> for RcFnKind<X>
+    where
+        X: 'static,
+        T: 'static + Clone,
+        Self: Apply<T, T>,
+        Self: Kind<Of<T> = RcFn<X, T>>,
+    {
+        /// Lifts a value `T` into an `RcFn<X, T>` (a function `X -> T`).
+        ///
+        /// The resulting function, when called with any input of type `X`,
+        /// ignores that input and always returns a clone of the original `value`.
+        ///
+        /// Requires `T: Clone` because the lifted value is cloned by the returned function.
+        fn pure(value: T) -> Self::Of<T> {
+            RcFn(Rc::new(move |_x: X| value.clone()))
+        }
+    }
+
+    // Applicative for RcFnKind<X> — specialized CFn case.
+    //
+    // `CFn<A,B>` is not `Clone` (it wraps `Box<dyn Fn>`), so the generic
+    // `Applicative<T: Clone>` impl above does not cover it. This impl provides
+    // `pure` for `CFn<A,B>` by converting the inner `Box` to `Rc` (enabling
+    // O(1) cloning) and creating a new delegating `CFn` wrapper on each call.
+    //
+    // Coherence note: the two impls do NOT overlap because `CFn<A,B>` does not
+    // implement `Clone` in this crate, and — due to the orphan rules — no
+    // downstream crate can add `impl Clone for CFn<A,B>` either.
+    impl<X, A, B> Applicative<CFn<A, B>> for RcFnKind<X>
+    where
+        X: 'static,
+        A: 'static,
+        B: 'static,
+        Self: Apply<CFn<A, B>, CFn<A, B>>,
+        Self: Kind<Of<CFn<A, B>> = RcFn<X, CFn<A, B>>>,
+    {
+        /// Lifts a `CFn<A,B>` into `RcFn<X, CFn<A,B>>`.
+        ///
+        /// Because `CFn` is not `Clone`, the inner `Box<dyn Fn(A)->B>` is first
+        /// converted to `Rc<dyn Fn(A)->B>`. On each call to the resulting `RcFn`,
+        /// a new `CFn` is created that delegates to the shared `Rc`, costing only
+        /// one `Rc` reference-count bump per call.
+        fn pure(value: CFn<A, B>) -> RcFn<X, CFn<A, B>> {
+            // Convert Box → Rc so the underlying function can be shared cheaply.
+            let shared: Rc<dyn Fn(A) -> B + 'static> = Rc::from(value.0);
+            RcFn(Rc::new(move |_x: X| {
+                // Clone the Rc (O(1)) and wrap in a new CFn that delegates.
+                let rc_clone = Rc::clone(&shared);
+                CFn(Box::new(move |a: A| (rc_clone.as_ref())(a)))
+            }))
+        }
+    }
+
     // Applicative for CFnOnceKind
     // Lifts a value `T` into `CFnOnce<X, T>`
     impl<X, T> Applicative<T> for CFnOnceKind<X>
@@ -189,8 +245,8 @@ pub mod kind {
     /// ## Example
     ///
     /// ```
-    /// use monadify::applicative::kind::lift_a1;
-    /// use monadify::kind_based::kind::{OptionKind, VecKind}; // For context type
+    /// use monadify::applicative::kind::{lift_a1, lift_a1_rc};
+    /// use monadify::kind_based::kind::{OptionKind, VecKind};
     ///
     /// // Using lift_a1 with Option
     /// let opt_val: Option<i32> = Some(5);
@@ -201,21 +257,15 @@ pub mod kind {
     /// );
     /// assert_eq!(lifted_opt, Some("10".to_string()));
     ///
-    /// // Using lift_a1 with Vec
-    /// // Note: This example would fail if `CFn` needed to be cloned by `Applicative::pure`
-    /// // for `VecKind`, as `CFn` is not `Clone`.
-    /// // The current `lift_a1` requires `F: Applicative<CFn<A, B>>`.
-    /// // `VecKind`'s `Applicative<T>` impl requires `T: Clone`.
-    /// // Thus, `VecKind` needs `Applicative<CFn<A,B>>` where `CFn<A,B>: Clone`.
-    /// // Since `CFn` is not `Clone`, this specific example is commented out.
-    /// /*
+    /// // Using lift_a1_rc with Vec — re-enabled via RcFn (which IS Clone).
+    /// // `lift_a1` over VecKind required `CFn<A,B>: Clone`, which `CFn` cannot satisfy.
+    /// // `lift_a1_rc` uses `RcFn<A,B>` instead, which derives `Clone`.
     /// let vec_val: Vec<i32> = vec![1, 2, 3];
-    /// let lifted_vec: Vec<bool> = lift_a1::<VecKind, _, _, _>(
+    /// let lifted_vec: Vec<bool> = lift_a1_rc::<VecKind, _, _, _>(
     ///     |x: i32| x % 2 == 0,
     ///     vec_val
     /// );
     /// assert_eq!(lifted_vec, vec![false, true, false]);
-    /// */
     /// ```
     pub fn lift_a1<F, A, B, FuncImpl>(
         func: FuncImpl,
@@ -238,6 +288,45 @@ pub mod kind {
         //    `F::apply(fa, f_in_context)` where `fa` is `F::Of<A>`.
         //    This requires `F` to be `Apply<A, B>`.
         F::apply(fa, f_in_context)
+    }
+
+    /// Lifts a unary function `A -> B` to operate on Kind `Applicative` values using
+    /// [`RcFn`] as the function container.
+    ///
+    /// This is the `RcFn`-backed sibling of [`lift_a1`].  [`lift_a1`] builds
+    /// `F::pure(CFn::new(func))`, requiring `CFn<A,B>: Clone` — a bound `CFn`
+    /// cannot satisfy.  `lift_a1_rc` builds `F::pure(RcFn::new(func))` instead;
+    /// [`RcFn`] derives `Clone`, so `VecKind::Applicative<RcFn<A,B>>` compiles.
+    ///
+    /// # Parameters
+    /// - `F`: The Kind marker; must implement `Applicative<RcFn<A,B>>` and `ApplyRc<A,B>`.
+    /// - `func`: The function `A -> B` to lift.
+    /// - `fa`: The applicative value `F::Of<A>`.
+    ///
+    /// # Returns
+    /// The result `F::Of<B>`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use monadify::applicative::kind::lift_a1_rc;
+    /// use monadify::kind_based::kind::VecKind;
+    ///
+    /// let fa: Vec<i32> = vec![1, 2, 3];
+    /// let result: Vec<bool> = lift_a1_rc::<VecKind, _, _, _>(|x: i32| x % 2 == 0, fa);
+    /// assert_eq!(result, vec![false, true, false]);
+    /// ```
+    pub fn lift_a1_rc<F, A, B, FuncImpl>(func: FuncImpl, fa: F::Of<A>) -> F::Of<B>
+    where
+        F: Applicative<RcFn<A, B>> + ApplyRc<A, B> + Kind1,
+        FuncImpl: Fn(A) -> B + 'static,
+        A: 'static,
+        B: 'static,
+    {
+        // 1. Wrap the function in RcFn (Clone-able) and lift it into the context.
+        let fc: F::Of<RcFn<A, B>> = F::pure(RcFn::new(func));
+        // 2. Apply the wrapped function to the wrapped value via apply_rc.
+        F::apply_rc(fa, fc)
     }
 }
 
