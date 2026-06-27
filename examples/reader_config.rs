@@ -6,8 +6,8 @@
 //! Run with: `cargo run --example reader_config --features do-notation`
 
 use monadify::identity::{Identity, IdentityKind};
+use monadify::mdo;
 use monadify::transformers::reader::{MonadReader, Reader, ReaderT, ReaderTKind};
-use monadify::{mdo, Applicative};
 
 /// Application configuration: base rate and scaling factor.
 #[derive(Clone, Debug, PartialEq)]
@@ -69,7 +69,7 @@ fn compute_pricing() -> ConfigReader<String> {
         factor <- get_scaling_factor();
         adjusted <- compute_adjusted_rate(base, factor);
         let label = format!("Base: {:.2}, Factor: {:.2}, Adjusted: {:.2}", base, factor, adjusted);
-        ReaderKind::pure(label)
+        pure(label)
     }
 }
 
@@ -83,7 +83,7 @@ fn compute_pricing_with_ask() -> ConfigReader<String> {
             "Config-based: Base={:.2}, Factor={:.2}, Adjusted={:.2}",
             cfg.base_rate, cfg.scaling_factor, adjusted
         );
-        ReaderKind::pure(label)
+        pure(label)
     }
 }
 
@@ -94,7 +94,7 @@ fn multi_step_pricing() -> ConfigReader<(f64, f64, f64)> {
         base <- get_base_rate();
         factor <- get_scaling_factor();
         adjusted <- compute_adjusted_rate(base, factor);
-        ReaderKind::pure((base, factor, adjusted))
+        pure((base, factor, adjusted))
     }
 }
 

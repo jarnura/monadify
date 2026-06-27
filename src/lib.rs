@@ -83,10 +83,13 @@ pub mod do_notation;
 ///     x <- Some(2);
 ///     y <- Some(3);
 ///     guard(x + y > 0);
-///     OptionKind::pure(x + y)      // raw monadic value, == Some(5)
+///     pure(x + y)      // bare `pure(...)` resolves to OptionKind::pure, == Some(5)
 /// };
 /// assert_eq!(r, Some(5));
 /// ```
+///
+/// Inside an `mdo!` block, any bare `pure(expr)` — not `::` -qualified or a
+/// method call — is automatically rewritten to the block's marker's `Applicative::pure`.
 ///
 /// # Limitations
 ///

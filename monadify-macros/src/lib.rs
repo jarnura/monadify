@@ -29,8 +29,8 @@
 //! re-export), where it can depend on `monadify` without a build cycle.
 
 use proc_macro::TokenStream;
-use proc_macro2::{Delimiter, Spacing, Span, TokenStream as TokenStream2, TokenTree};
-use quote::{quote, ToTokens};
+use proc_macro2::{Delimiter, Group, Spacing, Span, TokenStream as TokenStream2, TokenTree};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream, Parser};
 use syn::{Error, Expr, Pat, Result as SynResult, Token, Type};
 
@@ -53,6 +53,123 @@ struct MdoInput {
     final_expr: Expr,
 }
 
+/// Returns `true` if `tt` is a `:` punctuation token.
+fn is_colon(tt: &TokenTree) -> bool {
+    matches!(tt, TokenTree::Punct(p) if p.as_char() == ':')
+}
+
+/// Returns `true` if `tt` is a `:` punctuation token with `Spacing::Joint`
+/// (i.e., the first `:` of a `::` digraph).
+fn is_colon_joint(tt: &TokenTree) -> bool {
+    matches!(tt, TokenTree::Punct(p) if p.as_char() == ':' && p.spacing() == Spacing::Joint)
+}
+
+/// Returns `true` if `tt` is a `.` punctuation token.
+fn is_dot(tt: &TokenTree) -> bool {
+    matches!(tt, TokenTree::Punct(p) if p.as_char() == '.')
+}
+
+/// Rewrites every bare `pure(...)` call-head in `ts` to
+/// `<marker as ::monadify::Applicative<_>>::pure`, leaving qualified forms
+/// (`::pure`, `.pure`, or `pure` not followed by `(`) unchanged.
+///
+/// The walk is fully recursive: inner groups (parentheses, brackets, braces)
+/// are descended into so that nested forms like `foo(pure(3))` and
+/// `pure(pure(1))` are both handled correctly.
+///
+/// # Suppression rules (two-token look-behind)
+///
+/// The rewriter tracks the **last two emitted tokens** to distinguish the
+/// three digraph pairs that share a single-character prefix with valid
+/// separators:
+///
+/// - **`::pure` path qualifier** (suppress): the token immediately before
+///   `pure` is `:`, AND the token before that is also `:` with
+///   `Spacing::Joint`.  A lone `:` (struct-field colon) does NOT meet the
+///   second condition and must NOT suppress — `Foo { f: pure(x) }` should
+///   be rewritten.
+///
+/// - **`.pure` method call** (suppress): the token immediately before `pure`
+///   is `.`, AND the token before that is NOT `.`.  A `..` (range / struct
+///   update), where the preceding token IS `.`, must NOT suppress —
+///   `..pure(base)` should be rewritten.
+///
+/// - **next token is NOT `(`** (suppress): `pure` is not a call expression
+///   and is emitted unchanged.
+fn rewrite_pure(ts: TokenStream2, marker: &Type) -> TokenStream2 {
+    let mut out = TokenStream2::new();
+    // Peekable so we can inspect the token after `pure` without consuming it.
+    let mut iter = ts.into_iter().peekable();
+
+    // Two-token look-behind.
+    // `prev_*`  describes the most recently emitted token.
+    // `prev2_*` describes the token emitted before that.
+    let mut prev_is_colon = false;
+    let mut prev_colon_is_joint = false; // only meaningful when prev_is_colon
+    let mut prev_is_dot = false;
+    let mut prev2_is_colon_joint = false; // prev2 was `:` Spacing::Joint
+    let mut prev2_is_dot = false; // prev2 was `.`
+
+    while let Some(tt) = iter.next() {
+        // -- Detect bare `pure` ident eligible for rewriting ------------------
+        if let TokenTree::Ident(ref id) = tt {
+            if id == "pure" {
+                let next_is_paren = matches!(
+                    iter.peek(),
+                    Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Parenthesis
+                );
+                if next_is_paren {
+                    // `::pure`: prev is `:` AND prev2 is `:` Joint.
+                    // A lone `:` (struct-field) has prev2_is_colon_joint=false.
+                    let is_path_qual = prev_is_colon && prev2_is_colon_joint;
+                    // `.pure`: prev is `.` AND prev2 is NOT `.`.
+                    // `..pure` has prev2_is_dot=true, so it is NOT suppressed.
+                    let is_method = prev_is_dot && !prev2_is_dot;
+
+                    if !is_path_qual && !is_method {
+                        // Emit qualified UFCS path, carrying the ident's span
+                        // for better error locality.
+                        let span = id.span();
+                        let rewritten = quote_spanned! { span =>
+                            <#marker as ::monadify::Applicative<_>>::pure
+                        };
+                        out.extend(rewritten);
+                        // Update history: `pure` ident is not a `:` or `.`.
+                        prev2_is_colon_joint = prev_is_colon && prev_colon_is_joint;
+                        prev2_is_dot = prev_is_dot;
+                        prev_is_colon = false;
+                        prev_colon_is_joint = false;
+                        prev_is_dot = false;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // -- Update two-token history with `tt` before emitting it ------------
+        prev2_is_colon_joint = prev_is_colon && prev_colon_is_joint;
+        prev2_is_dot = prev_is_dot;
+        prev_is_colon = is_colon(&tt);
+        prev_colon_is_joint = is_colon_joint(&tt);
+        prev_is_dot = is_dot(&tt);
+
+        // -- Recurse into groups; emit everything else verbatim ----------------
+        match tt {
+            TokenTree::Group(g) => {
+                let inner = rewrite_pure(g.stream(), marker);
+                let mut new_g = Group::new(g.delimiter(), inner);
+                new_g.set_span(g.span());
+                out.extend(std::iter::once(TokenTree::Group(new_g)));
+            }
+            other => {
+                out.extend(std::iter::once(other));
+            }
+        }
+    }
+
+    out
+}
+
 /// Returns the index of a top-level `<-` (a `<` joined to a following `-`).
 fn find_left_arrow(tokens: &[TokenTree]) -> Option<usize> {
     for i in 0..tokens.len().saturating_sub(1) {
@@ -66,7 +183,12 @@ fn find_left_arrow(tokens: &[TokenTree]) -> Option<usize> {
 }
 
 /// Classify one statement segment (tokens between top-level `;`) into a [`Stmt`].
-fn classify(tokens: Vec<TokenTree>) -> SynResult<Stmt> {
+///
+/// `marker` is the block's Kind marker type; it is forwarded to [`rewrite_pure`]
+/// so that bare `pure(…)` calls in Bind, Bare, and Guard positions are rewritten
+/// to `<marker as ::monadify::Applicative<_>>::pure(…)` before parsing.
+/// Plain `let` bodies are explicitly **not** rewritten (the spec carve-out).
+fn classify(tokens: Vec<TokenTree>, marker: &Type) -> SynResult<Stmt> {
     if tokens.is_empty() {
         return Err(Error::new(
             Span::call_site(),
@@ -77,25 +199,26 @@ fn classify(tokens: Vec<TokenTree>) -> SynResult<Stmt> {
     // 1. `pat <- expr` — highest priority (the `<-` is unambiguous).
     if let Some(idx) = find_left_arrow(&tokens) {
         let pat_ts: TokenStream2 = tokens[..idx].iter().cloned().collect();
-        let expr_ts: TokenStream2 = tokens[idx + 2..].iter().cloned().collect();
+        let raw_expr_ts: TokenStream2 = tokens[idx + 2..].iter().cloned().collect();
         if pat_ts.is_empty() {
             return Err(Error::new(
                 tokens[idx].span(),
                 "mdo! bind requires a pattern before `<-`",
             ));
         }
-        if expr_ts.is_empty() {
+        if raw_expr_ts.is_empty() {
             return Err(Error::new(
                 tokens[idx].span(),
                 "mdo! bind requires a monadic expression after `<-`",
             ));
         }
         let pat = Pat::parse_single.parse2(pat_ts)?;
+        let expr_ts = rewrite_pure(raw_expr_ts, marker);
         let expr: Expr = syn::parse2(expr_ts)?;
         return Ok(Stmt::Bind(pat, expr));
     }
 
-    // 2. `let …` — keep verbatim.
+    // 2. `let …` — keep verbatim (no bare-pure rewrite inside plain let bodies).
     if let TokenTree::Ident(id) = &tokens[0] {
         if id == "let" {
             return Ok(Stmt::Let(tokens.into_iter().collect()));
@@ -104,14 +227,16 @@ fn classify(tokens: Vec<TokenTree>) -> SynResult<Stmt> {
         if id == "guard" && tokens.len() == 2 {
             if let TokenTree::Group(g) = &tokens[1] {
                 if g.delimiter() == Delimiter::Parenthesis {
-                    return Ok(Stmt::Guard(g.stream()));
+                    return Ok(Stmt::Guard(rewrite_pure(g.stream(), marker)));
                 }
             }
         }
     }
 
-    // 4. bare expression (sequencing).
-    let expr: Expr = syn::parse2(tokens.into_iter().collect())?;
+    // 4. bare expression (sequencing) — rewrite pure before parsing.
+    let raw_ts: TokenStream2 = tokens.into_iter().collect();
+    let expr_ts = rewrite_pure(raw_ts, marker);
+    let expr: Expr = syn::parse2(expr_ts)?;
     Ok(Stmt::Bare(expr))
 }
 
@@ -183,11 +308,13 @@ impl Parse for MdoInput {
                 "the final line of an mdo! block must be a raw monadic value, not a `<-` bind",
             ));
         }
-        let final_expr: Expr = syn::parse2(final_tokens.into_iter().collect())?;
+        // Apply bare-pure rewriting to the final expression before parsing it.
+        let final_raw_ts: TokenStream2 = final_tokens.into_iter().collect();
+        let final_expr: Expr = syn::parse2(rewrite_pure(final_raw_ts, &marker))?;
 
         let mut stmts = Vec::with_capacity(segments.len());
         for (tokens, _) in segments {
-            stmts.push(classify(tokens)?);
+            stmts.push(classify(tokens, &marker)?);
         }
 
         Ok(MdoInput {
@@ -217,6 +344,31 @@ impl Parse for MdoInput {
 /// Each non-final monadic right-hand side is cloned (`(expr).clone()`) because
 /// `bind`'s closure is `FnMut + Clone + 'static` and `VecKind::bind` re-invokes
 /// it per element. The final expression is returned raw as `Marker::Of<B>`.
+///
+/// # The `pure` keyword
+///
+/// Inside an `mdo!` block, any bare call of the form `pure(expr)` — where
+/// `pure` appears as a free identifier immediately followed by a `(`-group —
+/// is automatically rewritten to
+/// `<Marker as ::monadify::Applicative<_>>::pure(expr)`.
+///
+/// The rewriter uses two-token look-behind to avoid false positives:
+///
+/// - `pure` is **not** rewritten when `::` -qualified: `Marker::pure(x)` is
+///   left verbatim (the two preceding `:` tokens form the `::` digraph).
+/// - `pure` is **not** rewritten when called as a method: `x.pure(y)` is
+///   left verbatim (a lone `.` precedes `pure` and the token before that is
+///   not another `.`).
+/// - `pure` in a struct-field position (`Foo { f: pure(x) }`) **is**
+///   rewritten — the single `:` before `pure` is distinct from `::` because
+///   no Joint `:` precedes it.
+/// - `pure` after `..` (`..pure(base)`) **is** rewritten — the double `.`
+///   forms a range/struct-update digraph, not a method receiver.
+/// - `pure::<T>(x)` is **not** rewritten — the next token after `pure` is
+///   `<`, not `(`, so the call-shape guard prevents rewriting.
+/// - `let`-body carve-out is statement-level only: `let x = pure(v)` inside
+///   an `mdo!` block is a `Stmt::Let` and the right-hand side is **not**
+///   rewritten. Use `x <- pure(v)` (bind) instead.
 ///
 /// # Limitations
 ///

@@ -98,7 +98,7 @@ let result: Option<i32> = mdo! {
     x <- Some(2);
     y <- Some(3);
     guard(x + y > 0);      // filters; short-circuits if false
-    OptionKind::pure(x + y)  // == Some(5)
+    pure(x + y)            // bare `pure(...)` resolves to OptionKind::pure, == Some(5)
 };
 assert_eq!(result, Some(5));
 ```
@@ -110,7 +110,8 @@ assert_eq!(result, Some(5));
 
 Run with: `cargo run --example validation --features do-notation`
 
-**Limitations**:
+**Limitations and notes**:
+- `pure` is a reserved free-call head inside `mdo!` blocks (rewritten to `Marker::pure`); use `::pure`-qualified or `.pure()` method syntax to bypass
 - `CFn` / `CFnOnce` unsupported (they are not `Clone`)
 - At most one non-`Copy` external value per `mdo!` nesting level (closure capture constraint)
 
