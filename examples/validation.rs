@@ -5,7 +5,7 @@
 //!
 //! Run with: `cargo run --example validation --features do-notation`
 
-use monadify::{mdo, Applicative, OptionKind, ResultKind};
+use monadify::{mdo, OptionKind, ResultKind};
 
 /// Check if a number is in a valid range.
 fn validate_range(n: i32, min: i32, max: i32) -> Option<i32> {
@@ -61,7 +61,7 @@ fn process_numbers_after(a: i32, b: i32) -> Option<ValidationResult> {
         b_val <- is_positive(b);
         a_checked <- validate_range(a_val, 1, 100);
         b_checked <- validate_range(b_val, 1, 100);
-        OptionKind::pure(ValidationResult {
+        pure(ValidationResult {
             original: a_checked + b_checked,
             squared: a_checked * a_checked + b_checked * b_checked,
             sum: a_checked + b_checked,
@@ -93,7 +93,7 @@ fn process_numbers_with_errors(a: i32, b: i32) -> Result<ValidationResult, Strin
         } else {
             Err(format!("Second number {} exceeds max 100", b_val))
         };
-        ResultKind::<String>::pure(ValidationResult {
+        pure(ValidationResult {
             original: a_checked + b_checked,
             squared: a_checked * a_checked + b_checked * b_checked,
             sum: a_checked + b_checked,

@@ -5,7 +5,7 @@
 //!
 //! Run with: `cargo run --example list_comprehension --features do-notation`
 
-use monadify::{mdo, Applicative, VecKind};
+use monadify::{mdo, VecKind};
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// BEFORE: Nested flat_map and filter chains (imperative-looking but cluttered)
@@ -39,7 +39,7 @@ fn pythagorean_triples_after(limit: i32) -> Vec<(i32, i32, i32)> {
         b <- (1..=limit).collect::<Vec<_>>();
         c <- (1..=limit).collect::<Vec<_>>();
         guard(a * a + b * b == c * c);
-        VecKind::pure((a, b, c))
+        pure((a, b, c))
     }
 }
 
@@ -49,7 +49,7 @@ fn even_numbers(n: i32) -> Vec<i32> {
         VecKind;
         x <- (1..=n).collect::<Vec<_>>();
         guard(x % 2 == 0);
-        VecKind::pure(x)
+        pure(x)
     }
 }
 
@@ -61,7 +61,7 @@ fn sum_pairs_under_10(max_x: i32, max_y: i32) -> Vec<(i32, i32)> {
         x <- (1..=max_x).collect::<Vec<_>>();
         y <- (1..=max_y).collect::<Vec<_>>();
         guard(x + y <= 10);
-        VecKind::pure((x, y))
+        pure((x, y))
     }
 }
 
@@ -70,7 +70,7 @@ fn repeated_digit_numbers() -> Vec<i32> {
     mdo! {
         VecKind;
         digit <- (1..=9).collect::<Vec<_>>();
-        VecKind::pure(digit * 10 + digit)
+        pure(digit * 10 + digit)
     }
 }
 
@@ -81,7 +81,7 @@ fn points_near_origin(max_x: i32, max_y: i32, max_distance_sq: i32) -> Vec<(i32,
         x <- (-max_x..=max_x).collect::<Vec<_>>();
         y <- (-max_y..=max_y).collect::<Vec<_>>();
         guard(x * x + y * y <= max_distance_sq);
-        VecKind::pure((x, y))
+        pure((x, y))
     }
 }
 
@@ -91,7 +91,7 @@ fn multiples_of_3_xor_5(n: i32) -> Vec<i32> {
         VecKind;
         x <- (1..=n).collect::<Vec<_>>();
         guard((x % 3 == 0 && x % 5 != 0) || (x % 3 != 0 && x % 5 == 0));
-        VecKind::pure(x)
+        pure(x)
     }
 }
 

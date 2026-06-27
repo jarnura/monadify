@@ -15,6 +15,7 @@
 // intentional here for cross-instance test symmetry.
 #![allow(clippy::clone_on_copy)]
 
+pub mod auto_pure;
 pub mod cfn_unsupported;
 pub mod identity;
 pub mod laws;
