@@ -76,6 +76,46 @@ let opt_str: Option<String> = Some("5".to_string());
 
 For more detailed examples, please refer to the documentation comments within the source code and the test files in the `tests/` directory.
 
+## Do Notation
+
+The library includes an optional **`do-notation`** feature that provides the `mdo!` macro, inspired by Haskell's `do` expressions. It lets you write monadic computations in a flat, imperative style instead of nested closures.
+
+**Enable with**: `--features do-notation` (optional feature; zero-dependency by default)
+
+**Syntax**: `mdo! { Marker; pat <- expr; ...; final_expr }`
+- Marker must be explicit (e.g., `OptionKind`, `ResultKind::<E>`) — type inference is impossible
+- Each `pat <- expr` is a monadic bind; `expr` is cloned once per bind step
+- `guard(cond)` filters elements (Option/Vec only; short-circuits on failure)
+- `let binding = expr;` introduces pure local bindings
+- Final expression is returned raw (not auto-wrapped with `pure`)
+
+**Quick example**:
+```rust,ignore
+use monadify::{mdo, OptionKind, Applicative};
+
+let result: Option<i32> = mdo! {
+    OptionKind;
+    x <- Some(2);
+    y <- Some(3);
+    guard(x + y > 0);      // filters; short-circuits if false
+    OptionKind::pure(x + y)  // == Some(5)
+};
+assert_eq!(result, Some(5));
+```
+
+**Real-world examples**: See `examples/` directory:
+- `validation.rs` — Validation pipelines with short-circuit on first error (Option/Result)
+- `reader_config.rs` — Environment threading (ReaderT + Config); "real power" demo
+- `list_comprehension.rs` — List comprehensions with `guard` filtering (Vec)
+
+Run with: `cargo run --example validation --features do-notation`
+
+**Limitations**:
+- `CFn` / `CFnOnce` unsupported (they are not `Clone`)
+- At most one non-`Copy` external value per `mdo!` nesting level (closure capture constraint)
+
+See [`monadify::mdo`](https://docs.rs/monadify) documentation for full details.
+
 ## Building the Project
 
 To build the library:

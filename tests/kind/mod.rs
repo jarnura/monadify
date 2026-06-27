@@ -8,3 +8,7 @@ pub mod kind;
 pub mod monad;
 pub mod proptest_laws;
 pub mod transformers;
+
+// Do-notation tests: compiled only when the `do-notation` feature is enabled.
+#[cfg(feature = "do-notation")]
+pub mod do_notation;

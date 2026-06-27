@@ -1,3 +1,7 @@
+[workspace]
+members = [".", "monadify-macros"]
+resolver = "2"
+
 [package]
 name = "monadify"
 description = "A library for functional programming abstractions in Rust, focusing on Monads, Functors, Applicatives, and related concepts."
@@ -14,6 +18,9 @@ keywords = ["functional", "fp", "monad"]
 categories = ["rust-patterns"] # Removed "no-std" as std is currently used
 
 [dependencies]
+# Default graph stays EMPTY. The macro crate is an OPTIONAL dependency, pulled in
+# only by the `do-notation` feature via `dep:` syntax (see [features]).
+monadify-macros = { path = "monadify-macros", version = "0.1.1", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports"] }
@@ -26,3 +33,18 @@ harness = false
 [features]
 default = [] # HKT is now the default, no feature needed to enable it.
 legacy = []  # Optional feature to include legacy implementations.
+# NON-default. Enables the procedural `mdo!` do-notation macro. `dep:` suppresses
+# the implicit same-named feature so this is the single switch for the macro crate.
+do-notation = ["dep:monadify-macros"]
+
+[[example]]
+name = "validation"
+required-features = ["do-notation"]
+
+[[example]]
+name = "reader_config"
+required-features = ["do-notation"]
+
+[[example]]
+name = "list_comprehension"
+required-features = ["do-notation"]
