@@ -31,7 +31,7 @@ pub mod option_kind_functor_laws {
         // Renamed test
         let opt = Some(10);
         let identity_fn = clone_fn_map(|x: i32| x);
-        assert_eq!(OptionKind::map(opt.clone(), identity_fn), opt); // Renamed Marker
+        assert_eq!(OptionKind::map(opt, identity_fn), opt); // Renamed Marker
     }
 
     #[test]
@@ -39,7 +39,7 @@ pub mod option_kind_functor_laws {
         // Renamed test
         let opt: Option<i32> = None;
         let identity_fn = clone_fn_map(|x: i32| x);
-        assert_eq!(OptionKind::map(opt.clone(), identity_fn), opt); // Renamed Marker
+        assert_eq!(OptionKind::map(opt, identity_fn), opt); // Renamed Marker
     }
 
     // Composition law: OptionKind::map(opt, |x| g(f(x))) == OptionKind::map(OptionKind::map(opt, f), g)
@@ -52,8 +52,7 @@ pub mod option_kind_functor_laws {
 
         let f_clone = f.clone();
         let g_clone = g.clone();
-        let composed_map =
-            OptionKind::map(opt.clone(), move |x| g_clone.clone()(f_clone.clone()(x))); // Renamed Marker
+        let composed_map = OptionKind::map(opt, move |x| g_clone.clone()(f_clone.clone()(x))); // Renamed Marker
         let sequential_map = OptionKind::map(OptionKind::map(opt, f), g); // Renamed Marker
 
         assert_eq!(composed_map, sequential_map);
@@ -69,8 +68,7 @@ pub mod option_kind_functor_laws {
 
         let f_clone = f.clone();
         let g_clone = g.clone();
-        let composed_map =
-            OptionKind::map(opt.clone(), move |x| g_clone.clone()(f_clone.clone()(x))); // Renamed Marker
+        let composed_map = OptionKind::map(opt, move |x| g_clone.clone()(f_clone.clone()(x))); // Renamed Marker
         let sequential_map = OptionKind::map(OptionKind::map(opt, f), g); // Renamed Marker
 
         assert_eq!(composed_map, sequential_map);
@@ -483,7 +481,7 @@ pub mod reader_t_kind_functor_laws {
         let env_val = "test_env".to_string();
         let reader_t_creator = || ReaderT::new(move |_env: EnvReader| Some(10));
 
-        let f = clone_fn_map(|x: i32| (x as f64 * 2.0));
+        let f = clone_fn_map(|x: i32| x as f64 * 2.0);
         let g = clone_fn_map(|y: f64| format!("Value: {:.1}", y));
 
         let f_clone_composed = f.clone();
@@ -514,7 +512,7 @@ pub mod reader_t_kind_functor_laws {
         let env_val = "test_env".to_string();
         let reader_t_creator = || ReaderT::new(move |_env: EnvReader| None::<i32>);
 
-        let f = clone_fn_map(|x: i32| (x as f64 * 2.0));
+        let f = clone_fn_map(|x: i32| x as f64 * 2.0);
         let g = clone_fn_map(|y: f64| format!("Value: {:.1}", y));
 
         let f_clone_composed = f.clone();

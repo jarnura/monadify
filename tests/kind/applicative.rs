@@ -22,14 +22,8 @@ fn option_kind_applicative_law_identity() {
     let id_cfn_creator = || CFn::new(identity::<i32>);
     let pure_id_cfn_creator = || OptionKind::pure(id_cfn_creator()); // Renamed Marker
 
-    assert_eq!(
-        OptionKind::apply(v_some.clone(), pure_id_cfn_creator()),
-        v_some
-    ); // Renamed Marker
-    assert_eq!(
-        OptionKind::apply(v_none.clone(), pure_id_cfn_creator()),
-        v_none
-    ); // Renamed Marker
+    assert_eq!(OptionKind::apply(v_some, pure_id_cfn_creator()), v_some); // Renamed Marker
+    assert_eq!(OptionKind::apply(v_none, pure_id_cfn_creator()), v_none); // Renamed Marker
 }
 
 #[test]
@@ -65,12 +59,12 @@ fn option_kind_applicative_law_interchange() {
     let pure_y: Option<A> = OptionKind::pure(y_val); // Renamed Marker
 
     // LHS: apply(pure(y), u)
-    let lhs_some = OptionKind::apply(pure_y.clone(), u_some_creator()); // Renamed Marker
-    let lhs_none = OptionKind::apply(pure_y.clone(), u_none_creator()); // Renamed Marker
+    let lhs_some = OptionKind::apply(pure_y, u_some_creator()); // Renamed Marker
+    let lhs_none = OptionKind::apply(pure_y, u_none_creator()); // Renamed Marker
 
-    let y_val_clone_for_rhs = y_val.clone();
+    let y_val_clone_for_rhs = y_val;
     let interchange_fn_creator =
-        || CFn::new(move |f_map_fn: CFn<A, B>| f_map_fn.call(y_val_clone_for_rhs.clone()));
+        || CFn::new(move |f_map_fn: CFn<A, B>| f_map_fn.call(y_val_clone_for_rhs));
     let pure_interchange_fn_wrapper_creator = || OptionKind::pure(interchange_fn_creator()); // Renamed Marker
 
     let rhs_some = OptionKind::apply(u_some_creator(), pure_interchange_fn_wrapper_creator()); // Renamed Marker
@@ -90,11 +84,11 @@ fn option_kind_lift_a1_functor_identity() {
     let id_fn_static = identity::<i32>;
 
     assert_eq!(
-        lift_a1::<OptionKind, _, _, _>(id_fn_static, fa_some.clone()),
+        lift_a1::<OptionKind, _, _, _>(id_fn_static, fa_some),
         fa_some
     ); // Renamed Marker
     assert_eq!(
-        lift_a1::<OptionKind, _, _, _>(id_fn_static, fa_none.clone()),
+        lift_a1::<OptionKind, _, _, _>(id_fn_static, fa_none),
         fa_none
     ); // Renamed Marker
 }
@@ -109,13 +103,13 @@ fn option_kind_lift_a1_functor_composition() {
     let g = |y: i32| y.to_string();
     let g_compose_f = move |x: i32| g(f(x));
 
-    let lhs_some = lift_a1::<OptionKind, _, _, _>(g_compose_f, fa_some.clone()); // Renamed Marker
-    let lhs_none = lift_a1::<OptionKind, _, _, _>(g_compose_f, fa_none.clone()); // Renamed Marker
+    let lhs_some = lift_a1::<OptionKind, _, _, _>(g_compose_f, fa_some); // Renamed Marker
+    let lhs_none = lift_a1::<OptionKind, _, _, _>(g_compose_f, fa_none); // Renamed Marker
 
-    let map_f_fa_some = lift_a1::<OptionKind, _, _, _>(f, fa_some.clone()); // Renamed Marker
+    let map_f_fa_some = lift_a1::<OptionKind, _, _, _>(f, fa_some); // Renamed Marker
     let rhs_some = lift_a1::<OptionKind, _, _, _>(g, map_f_fa_some); // Renamed Marker
 
-    let map_f_fa_none = lift_a1::<OptionKind, _, _, _>(f, fa_none.clone()); // Renamed Marker
+    let map_f_fa_none = lift_a1::<OptionKind, _, _, _>(f, fa_none); // Renamed Marker
     let rhs_none = lift_a1::<OptionKind, _, _, _>(g, map_f_fa_none); // Renamed Marker
 
     assert_eq!(lhs_some, rhs_some);
@@ -178,9 +172,9 @@ fn result_kind_applicative_law_interchange() {
     let lhs_ok = ResultKind::<TestError>::apply(pure_y.clone(), u_ok_creator()); // Renamed Marker
     let lhs_err = ResultKind::<TestError>::apply(pure_y.clone(), u_err_creator()); // Renamed Marker
 
-    let y_val_clone_for_rhs = y_val.clone();
+    let y_val_clone_for_rhs = y_val;
     let interchange_fn_creator =
-        || CFn::new(move |f_map_fn: CFn<A, B>| f_map_fn.call(y_val_clone_for_rhs.clone()));
+        || CFn::new(move |f_map_fn: CFn<A, B>| f_map_fn.call(y_val_clone_for_rhs));
     let pure_interchange_fn_wrapper_creator =
         || ResultKind::<TestError>::pure(interchange_fn_creator()); // Renamed Marker
 
@@ -345,9 +339,9 @@ fn identity_kind_applicative_law_interchange() {
 
     let lhs = IdentityKind::apply(pure_y.clone(), u_identity_creator()); // Renamed Marker
 
-    let y_val_clone_for_rhs = y_val.clone();
+    let y_val_clone_for_rhs = y_val;
     let interchange_fn_creator =
-        || CFn::new(move |f_map_fn: CFn<A, B>| f_map_fn.call(y_val_clone_for_rhs.clone()));
+        || CFn::new(move |f_map_fn: CFn<A, B>| f_map_fn.call(y_val_clone_for_rhs));
     let pure_interchange_fn_wrapper_creator = || IdentityKind::pure(interchange_fn_creator()); // Renamed Marker
 
     let rhs = IdentityKind::apply(u_identity_creator(), pure_interchange_fn_wrapper_creator()); // Renamed Marker
@@ -524,7 +518,7 @@ fn reader_t_kind_functor_identity_via_map() {
 
     let env_val = 100;
     assert_eq!(
-        (mapped.run_reader_t)(env_val.clone()),
+        (mapped.run_reader_t)(env_val),
         (fa_creator().run_reader_t)(env_val)
     );
 }
@@ -549,9 +543,6 @@ fn reader_t_kind_functor_composition_via_map() {
     let rhs = ReaderTKind::<ReaderEnv, IdentityKind>::map(map_f_fa, g); // Renamed Marker
 
     let env_val = 100;
-    assert_eq!(
-        (lhs.run_reader_t)(env_val.clone()),
-        (rhs.run_reader_t)(env_val.clone())
-    );
+    assert_eq!((lhs.run_reader_t)(env_val), (rhs.run_reader_t)(env_val));
     assert_eq!((lhs.run_reader_t)(env_val), IdType("20".to_string()));
 }

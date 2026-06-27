@@ -66,7 +66,7 @@ mod applicative_laws {
         let v = Some(10);
         assert_eq!(
             Apply::apply(
-                v.clone(),
+                v,
                 <Option<_> as Applicative<CFn<i32, i32>>>::pure(CFn::new(identity::<i32>))
             ),
             v
@@ -78,7 +78,7 @@ mod applicative_laws {
         let v: Option<i32> = None;
         assert_eq!(
             Apply::apply(
-                v.clone(),
+                v,
                 <Option<_> as Applicative<CFn<i32, i32>>>::pure(CFn::new(identity::<i32>))
             ),
             v
@@ -93,7 +93,7 @@ mod applicative_laws {
 
         assert_eq!(
             Apply::apply(
-                pure_x.clone(),
+                pure_x,
                 <Option<_> as Applicative<CFn<i32, i32>>>::pure(CFn::new(f))
             ),
             <Option<_> as Applicative<i32>>::pure(f(x))
@@ -145,7 +145,7 @@ mod applicative_laws {
         let f = |x: i32| x.to_string();
         let pure_f = <Option<_> as Applicative<CFn<i32, String>>>::pure(CFn::new(f));
 
-        let lhs = Functor::map(v.clone(), f); // clone v for map
+        let lhs = Functor::map(v, f); // clone v for map
         let rhs = Apply::apply(v, pure_f);
 
         assert_eq!(lhs, rhs);
@@ -158,7 +158,7 @@ mod applicative_laws {
         let f = |x: i32| x.to_string();
         let pure_f = <Option<_> as Applicative<CFn<i32, String>>>::pure(CFn::new(f));
 
-        let lhs = Functor::map(v.clone(), f); // clone v for map
+        let lhs = Functor::map(v, f); // clone v for map
         let rhs = Apply::apply(v, pure_f);
 
         assert_eq!(lhs, rhs);
@@ -254,7 +254,7 @@ mod result_applicative_laws {
 
         let u_for_rhs: Result<CFn<i32, i32>, String> = Ok(CFn::new(f));
         // The closure for map needs to capture y.
-        let y_clone_for_map = y.clone();
+        let y_clone_for_map = y;
         let rhs = Functor::map(u_for_rhs, move |f_func: CFn<i32, i32>| {
             (f_func).call(y_clone_for_map)
         });
@@ -272,7 +272,7 @@ mod result_applicative_laws {
             <Result<_, String> as Applicative<i32>>::pure(y),
             Err("function error".to_string()),
         );
-        let y_clone_for_map = y.clone();
+        let y_clone_for_map = y;
         let rhs = Functor::map(u, move |f_func: CFn<i32, i32>| {
             (f_func).call(y_clone_for_map)
         });
@@ -359,11 +359,9 @@ mod vec_applicative_laws {
         let u_lhs: Vec<CFn<i32, i32>> = vec![CFn::new(add_5), CFn::new(mul_2)];
         let lhs = Apply::apply(<Vec<_> as Applicative<i32>>::pure(y), u_lhs);
 
-        let y_cloned = y.clone();
+        let y_cloned = y;
         let u_rhs: Vec<CFn<i32, i32>> = vec![CFn::new(add_5), CFn::new(mul_2)];
-        let rhs = Functor::map(u_rhs, move |f_val: CFn<i32, i32>| {
-            (f_val).call(y_cloned.clone())
-        });
+        let rhs = Functor::map(u_rhs, move |f_val: CFn<i32, i32>| (f_val).call(y_cloned));
 
         assert_eq!(lhs, rhs);
         assert_eq!(lhs, vec![15, 20]);
@@ -377,10 +375,8 @@ mod vec_applicative_laws {
 
         let lhs = Apply::apply(<Vec<_> as Applicative<i32>>::pure(y), u_lhs);
 
-        let y_cloned = y.clone();
-        let rhs = Functor::map(u_rhs, move |f_val: CFn<i32, i32>| {
-            (f_val).call(y_cloned.clone())
-        });
+        let y_cloned = y;
+        let rhs = Functor::map(u_rhs, move |f_val: CFn<i32, i32>| (f_val).call(y_cloned));
 
         assert_eq!(lhs, rhs);
         assert_eq!(lhs, Vec::<i32>::new());

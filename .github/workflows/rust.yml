@@ -47,6 +47,8 @@ jobs:
             flags: ""
           - name: legacy
             flags: "--features legacy"
+          - name: do-notation
+            flags: "--features do-notation"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -56,6 +58,21 @@ jobs:
       # `cargo test` runs unit, integration, and doc-tests.
       - name: Test
         run: cargo test --verbose ${{ matrix.flags }}
+
+  zero-dep:
+    name: zero-dependency guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Assert the DEFAULT-feature dependency graph pulls in no proc-macro deps
+      # (syn/quote/proc-macro2). The do-notation proc-macro must stay opt-in.
+      - name: Assert default features are dependency-free
+        run: |
+          cargo tree -e normal --prefix none | grep -Eq '^(syn|quote|proc-macro2) ' \
+            && { echo 'LEAK: proc-macro dep in default features'; exit 1; } \
+            || echo 'default features dependency-free'
 
   msrv:
     name: msrv (1.66)

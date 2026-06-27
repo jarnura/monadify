@@ -9,7 +9,7 @@ mod classic_apply_tests {
         let closure = monadify::fn2!(|x: i32| move |y: i8| format!("{x}{y}"));
         // Option::map uses Functor trait
         let some_closure =
-            <Option<i32> as monadify::legacy::functor::Functor<i32>>::map(Some(1), closure.clone());
+            <Option<i32> as monadify::legacy::functor::Functor<i32>>::map(Some(1), closure);
         let none_closure =
             <Option<i32> as monadify::legacy::functor::Functor<i32>>::map(None, closure);
 
@@ -25,7 +25,7 @@ mod classic_apply_tests {
 
         let closure_lift = monadify::fn2!(|x: i32| move |y: i8| format!("{x}{y}"));
         assert_eq!(
-            monadify::legacy::apply::lift2(closure_lift.clone(), Some(1), Some(2)),
+            monadify::legacy::apply::lift2(closure_lift, Some(1), Some(2)),
             Some("12".to_string())
         );
         assert_eq!(

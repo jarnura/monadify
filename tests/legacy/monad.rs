@@ -113,8 +113,7 @@ mod monad_laws {
         let f = |x: i32| -> Option<f64> { Some((x * 2) as f64) };
         let g = |y: f64| -> Option<String> { Some(y.to_string()) };
 
-        let lhs =
-            <Option<f64> as Bind<f64>>::bind(<Option<i32> as Bind<i32>>::bind(m.clone(), f), g);
+        let lhs = <Option<f64> as Bind<f64>>::bind(<Option<i32> as Bind<i32>>::bind(m, f), g);
 
         let f_inner = |x: i32| -> Option<f64> { Some((x * 2) as f64) };
         let g_inner = |y: f64| -> Option<String> { Some(y.to_string()) };
@@ -131,8 +130,7 @@ mod monad_laws {
         let f = |x: i32| -> Option<f64> { Some((x * 2) as f64) };
         let g = |y: f64| -> Option<String> { Some(y.to_string()) };
 
-        let lhs =
-            <Option<f64> as Bind<f64>>::bind(<Option<i32> as Bind<i32>>::bind(m.clone(), f), g);
+        let lhs = <Option<f64> as Bind<f64>>::bind(<Option<i32> as Bind<i32>>::bind(m, f), g);
 
         let f_inner = |x: i32| -> Option<f64> { Some((x * 2) as f64) };
         let g_inner = |y: f64| -> Option<String> { Some(y.to_string()) };
@@ -149,8 +147,7 @@ mod monad_laws {
         let f = |_x: i32| -> Option<f64> { None };
         let g = |y: f64| -> Option<String> { Some(y.to_string()) };
 
-        let lhs =
-            <Option<f64> as Bind<f64>>::bind(<Option<i32> as Bind<i32>>::bind(m.clone(), f), g);
+        let lhs = <Option<f64> as Bind<f64>>::bind(<Option<i32> as Bind<i32>>::bind(m, f), g);
 
         let f_inner = |_x: i32| -> Option<f64> { None };
         let g_inner = |y: f64| -> Option<String> { Some(y.to_string()) };
@@ -167,8 +164,7 @@ mod monad_laws {
         let f = |x: i32| -> Option<f64> { Some((x * 2) as f64) };
         let g = |_y: f64| -> Option<String> { None };
 
-        let lhs =
-            <Option<f64> as Bind<f64>>::bind(<Option<i32> as Bind<i32>>::bind(m.clone(), f), g);
+        let lhs = <Option<f64> as Bind<f64>>::bind(<Option<i32> as Bind<i32>>::bind(m, f), g);
 
         let f_inner = |x: i32| -> Option<f64> { Some((x * 2) as f64) };
         let g_inner = |_y: f64| -> Option<String> { None };

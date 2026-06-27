@@ -58,6 +58,66 @@ pub use kind_based::kind::{
 }; // Changed from ReaderTHKTMarker
    // Reader alias is re-exported above.
 
+/// Support items for the `do-notation` feature's `mdo!` macro (e.g. the
+/// `MdoGuard` helper trait backing `guard(..)`). Compiled only under the
+/// non-default `do-notation` feature.
+#[cfg(feature = "do-notation")]
+pub mod do_notation;
+
+/// Procedural `do`-notation macro. Available only under the non-default
+/// `do-notation` feature; desugars an imperative monadic block over the
+/// `Bind`/`Applicative` hierarchy. Usable as `monadify::mdo!`.
+///
+/// The block names its Kind marker explicitly (marker inference is impossible
+/// because the GAT `Of<Arg>` is not injective), terminated by `;`. Each
+/// statement is one of `let …`, `pat <- expr` (bind), `guard(expr)` (filter,
+/// for [`OptionKind`]/[`VecKind`] only), or a bare `expr` (sequencing),
+/// followed by a trailing raw final expression.
+///
+/// # Example
+///
+/// ```rust
+/// use monadify::{mdo, Applicative, OptionKind};
+///
+/// let r: Option<i32> = mdo! { OptionKind;
+///     x <- Some(2);
+///     y <- Some(3);
+///     guard(x + y > 0);
+///     OptionKind::pure(x + y)      // raw monadic value, == Some(5)
+/// };
+/// assert_eq!(r, Some(5));
+/// ```
+///
+/// # Limitations
+///
+/// **`CFnKind` / `CFnOnceKind` are not supported.** `CFn` and `CFnOnce` are
+/// not `Clone` (they wrap `Box<dyn Fn(…)>`). Because the desugaring emits
+/// `(expr).clone()` on every monadic right-hand side, any `mdo!` block over
+/// these markers fails with `E0599` at depth ≥ 1. See
+/// `tests/kind/do_notation/cfn_unsupported.rs` and the `monadify-macros`
+/// documentation for the full explanation and the future `Rc`-backed lift.
+///
+/// At most **one non-`Copy` external value may be captured per `mdo!` nesting
+/// level**. Because the desugaring emits nested `move` closures bound by
+/// `FnMut + Clone + 'static`, referencing the same non-`Copy` captured value
+/// (e.g. a [`ReaderT`], `String`, or other
+/// non-`Copy` binding) at two different bind depths moves it out of the outer
+/// `FnMut` and triggers `E0507`.
+///
+/// The bound results of monadic steps are usually `Copy` (`i32`, `bool`, …) and
+/// cross nesting levels freely; the constraint applies to *external* non-`Copy`
+/// values referenced inside the block. The workaround is to combine multiple
+/// reads into a single tuple-returning step so only `Copy` values cross deeper
+/// nesting levels. See the [`mdo`](macro@crate::mdo) macro's own documentation
+/// (re-exported from `monadify-macros`) for a worked example.
+#[cfg(feature = "do-notation")]
+pub use monadify_macros::mdo;
+
+/// Helper trait backing `guard(..)` inside `mdo!`. Available only under the
+/// non-default `do-notation` feature.
+#[cfg(feature = "do-notation")]
+pub use do_notation::MdoGuard;
+
 // Note on macros:
 // Macros defined with `#[macro_export]` in submodules (like `utils.rs`) are
 // automatically available at the crate root.

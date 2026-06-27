@@ -346,7 +346,7 @@ mod choice_laws {
             move |r: Result<X, u16>| map_result(f, r),    // Added move
             move |r: Result<X, String>| map_result(g, r), // Added move
         );
-        let lhs_result_err = lhs_p_err(input_err.clone());
+        let lhs_result_err = lhs_p_err(input_err);
 
         // --- RHS ---
         // Calculate RHS for Err input
@@ -366,7 +366,7 @@ mod choice_laws {
             move |r: Result<X, u16>| map_result(f, r),    // Added move
             move |r: Result<X, String>| map_result(g, r), // Added move
         );
-        let lhs_result_ok = lhs_p_ok(input_ok.clone());
+        let lhs_result_ok = lhs_p_ok(input_ok);
 
         // Calculate RHS for Ok input
         let p_rhs_ok: CFn<i32, String> = CFn::new(|x| format!("Value: {x}"));
@@ -409,7 +409,7 @@ mod choice_laws {
             move |r: Result<u16, X>| map_result_right(f, r), // Added move
             move |r: Result<String, X>| map_result_right(g, r), // Added move
         );
-        let lhs_result_ok = lhs_p_ok(input_ok.clone());
+        let lhs_result_ok = lhs_p_ok(input_ok);
 
         // --- RHS ---
         // Calculate RHS for Ok input
@@ -429,7 +429,7 @@ mod choice_laws {
             move |r: Result<u16, X>| map_result_right(f, r), // Added move
             move |r: Result<String, X>| map_result_right(g, r), // Added move
         );
-        let lhs_result_err = lhs_p_err(input_err.clone());
+        let lhs_result_err = lhs_p_err(input_err);
 
         // Calculate RHS for Err input
         let p_rhs_err: CFn<i32, String> = CFn::new(|x| format!("Value: {x}"));

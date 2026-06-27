@@ -58,7 +58,7 @@ mod classic_functor_tests {
             let f = |x: i32| x * 2;
             let g = |y: i32| y + 5;
 
-            let composed_map = <Option<i32> as Functor<i32>>::map(opt.clone(), move |x| g(f(x)));
+            let composed_map = <Option<i32> as Functor<i32>>::map(opt, move |x| g(f(x)));
             let sequential_map = <Option<i32> as Functor<i32>>::map(opt.map(f), g);
 
             assert_eq!(composed_map, sequential_map);
@@ -71,7 +71,7 @@ mod classic_functor_tests {
             let f = |x: i32| x * 2;
             let g = |y: i32| y + 5;
 
-            let composed_map = <Option<i32> as Functor<i32>>::map(opt.clone(), move |x| g(f(x)));
+            let composed_map = <Option<i32> as Functor<i32>>::map(opt, move |x| g(f(x)));
             let sequential_map = <Option<i32> as Functor<i32>>::map(opt.map(f), g);
 
             assert_eq!(composed_map, sequential_map);
@@ -151,8 +151,7 @@ mod classic_functor_tests {
             let f = |x: &str| x.to_uppercase();
             let g = |y: String| y.len();
 
-            let composed_map =
-                <Result<&str, u32> as Functor<&str>>::map(res.clone(), move |x| g(f(x)));
+            let composed_map = <Result<&str, u32> as Functor<&str>>::map(res, move |x| g(f(x)));
             let sequential_map = <Result<String, u32> as Functor<String>>::map(res.map(f), g);
 
             assert_eq!(composed_map, sequential_map);
@@ -165,8 +164,7 @@ mod classic_functor_tests {
             let f = |x: &str| x.to_uppercase();
             let g = |y: String| y.len();
 
-            let composed_map =
-                <Result<&str, u32> as Functor<&str>>::map(res.clone(), move |x| g(f(x)));
+            let composed_map = <Result<&str, u32> as Functor<&str>>::map(res, move |x| g(f(x)));
             let sequential_map = <Result<String, u32> as Functor<String>>::map(res.map(f), g);
 
             assert_eq!(composed_map, sequential_map);

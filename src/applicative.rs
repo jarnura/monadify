@@ -101,7 +101,7 @@ pub mod kind {
 
     impl<T: 'static> Applicative<T> for OptionKind {
         // Changed OptionHKTMarker to OptionKind
-        /// Lifts a value `T` into [`Some(T)`].
+        /// Lifts a value `T` into `Some(T)`.
         fn pure(value: T) -> Self::Of<T> {
             // Self::Of<T> is Option<T>
             Some(value)
@@ -110,7 +110,7 @@ pub mod kind {
 
     impl<T: 'static, E: 'static + Clone> Applicative<T> for ResultKind<E> {
         // Changed ResultHKTMarker to ResultKind
-        /// Lifts a value `T` into [`Ok(T)`].
+        /// Lifts a value `T` into `Ok(T)`.
         fn pure(value: T) -> Self::Of<T> {
             // Self::Of<T> is Result<T, E>
             Ok(value)

@@ -1,0 +1,26 @@
+[package]
+name = "monadify-macros"
+version = "0.1.1"
+edition = "2021"
+rust-version = "1.66" # match the parent monadify MSRV
+license = "MIT"
+description = "Procedural `mdo!` do-notation macro for the monadify crate."
+repository = "https://github.com/jarnura/monadify"
+
+[lib]
+proc-macro = true # MANDATORY: makes this a proc-macro crate
+
+[dependencies]
+# Upper bounds preserve MSRV 1.66 even on a fresh dependency resolution
+# (Cargo.lock is not committed for this library). The caps sit at the highest
+# versions verified to build on rustc 1.66:
+#   syn 2.0.87, quote 1.0.41, proc-macro2 1.0.86.
+# Beyond these the proc-macro toolchain raises its own MSRV — e.g. syn 2.0.88+
+# and quote 1.0.42+ require rustc >= 1.68/1.71. unicode-ident is transitive and
+# keeps an MSRV <= 1.66. Relax these caps only together with the crate MSRV.
+syn = { version = ">=2.0, <2.0.88", features = ["full"] }
+quote = ">=1.0, <1.0.42"
+proc-macro2 = ">=1.0, <1.0.87"
+# Transitive (via syn/proc-macro2); declared directly only to cap its MSRV.
+# unicode-ident 1.0.13+ raises its MSRV past 1.66; 1.0.12 is the safe ceiling.
+unicode-ident = ">=1.0, <1.0.13"
