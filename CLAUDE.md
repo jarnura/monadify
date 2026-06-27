@@ -11,7 +11,7 @@ plus profunctor-encoded optics. v0.1.1, MIT, edition 2021, MSRV 1.66.
 The defining design simulates **Higher-Kinded Types (HKTs)** using Generic
 Associated Types: a `Kind` trait with `type Of<Arg>` plus lightweight marker
 structs (`OptionKind`, `VecKind`, `ResultKind<E>`, `CFnKind<X>`, `CFnOnceKind<X>`,
-`IdentityKind`, `ReaderTKind`). Traits are generic over the *marker*, and
+`RcFnKind<X>`, `IdentityKind`, `ReaderTKind`). Traits are generic over the *marker*, and
 `Self::Of<A>` resolves to the concrete type (e.g. `OptionKind::Of<i32> == Option<i32>`).
 Core infrastructure lives in `src/kind_based/kind.rs`.
 
@@ -22,7 +22,7 @@ Core infrastructure lives in `src/kind_based/kind.rs`.
   `Functor → Apply → Applicative → Bind/Monad`, defined over Kind markers.
 - `src/profunctor.rs` — `Profunctor`/`Strong`/`Choice` and van-Laarhoven optics
   (`Lens`/`Getter`/`Fold`, `_1`/`_2`/`_key`, `view`, `lcmap`/`rmap`, `Forget`).
-- `src/function.rs` — `CFn`/`CFnOnce` boxed-closure wrappers + composition (`>>`/`<<`).
+- `src/function.rs` — `CFn`, `RcFn`, `CFnOnce` function wrappers + composition (`>>`/`<<`).
 - `src/identity.rs` — `Identity` monad. `src/transformers/reader.rs` — `ReaderT` +
   `MonadReader` (`ask`/`local`). `src/utils.rs` — `fn0!`..`fn3!` macros.
 - `src/legacy/` — the older associated-type implementation, behind the `legacy`
@@ -31,7 +31,7 @@ Core infrastructure lives in `src/kind_based/kind.rs`.
   criterion benchmarks comparing kind-based vs native vs legacy.
 
 Concrete instances implementing the full hierarchy (where lawful): `Option`,
-`Result`, `Vec`, `Identity`, `CFn`/`CFnOnce`, `ReaderT`.
+`Result`, `Vec`, `Identity`, `CFn`, `RcFn`, `CFnOnce`, `ReaderT`.
 
 ## Conventions
 
@@ -39,9 +39,11 @@ Concrete instances implementing the full hierarchy (where lawful): `Option`,
   identity/composition, Applicative, Monad left/right-identity + associativity,
   Profunctor). New instances must add law tests.
 - Map/bind closures require `FnMut(A) -> B + Clone + 'static`.
-- **Known constraint:** `CFn` is **not `Clone`**, which blocks some abstractions
-  (e.g. `lift_a1` for `VecKind` is commented out in `applicative.rs`). Keep this
-  in mind before adding `Clone`-dependent generic helpers.
+- **Function wrappers:** `CFn` is the unique-ownership, non-`Clone` wrapper (Box-backed).
+  `RcFn` is the shared-ownership, `Clone`-able alternative (Rc-backed); it re-enables
+  `lift_a1::<VecKind>` and works in `mdo!`. `CFnOnce` is intentionally non-`Clone`
+  (FnOnce semantics cannot be cloned). For `Clone`-dependent helpers, use `RcFn` or
+  bound generically over types that are `Clone`.
 - `#![deny(missing_docs)]` is enforced — all public items need docs.
 
 ## Quality gates
@@ -62,6 +64,15 @@ cargo bench                 # criterion benchmarks
 ```
 
 ## Memory (Hindsight)
+
+> **MANDATORY (user directive, 2026-06-27):** The Hindsight bank `monadify` is the
+> **sole memory of record**. At the **start of every session**, before other work,
+> `recall(tags=["project:monadify"])`; at the **end of durable work**, `retain` new
+> facts there. Use Hindsight for **all** long-term storage and retrieval — do **not**
+> accumulate durable knowledge in the file-based auto-memory (`MEMORY.md`), which
+> holds only a one-line breadcrumb pointing here. If the `hindsight` MCP server is
+> unavailable (e.g. an unauthenticated headless/cron run), say so explicitly rather
+> than silently falling back to file memory.
 
 This project has a dedicated [Hindsight](https://github.com/vectorize-io/hindsight)
 memory bank (`monadify`) holding the project's long-term context: git history

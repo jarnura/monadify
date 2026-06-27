@@ -43,10 +43,11 @@ pub mod kind {
 
     use crate::applicative::kind::Applicative; // Kind-based Applicative
     use crate::apply::kind::Apply; // Kind-based Apply
-    use crate::function::{CFn, CFnOnce};
+    use crate::function::{CFn, CFnOnce, RcFn};
     use crate::kind_based::kind::{
-        CFnKind, CFnOnceKind, Kind, Kind1, OptionKind, ResultKind, VecKind,
+        CFnKind, CFnOnceKind, Kind, Kind1, OptionKind, RcFnKind, ResultKind, VecKind,
     };
+    use std::rc::Rc;
 
     /// Kind-based `Monad` trait.
     ///
@@ -220,6 +221,36 @@ pub mod kind {
         }
     }
 
+    // Bind for RcFnKind<R> (Kleisli composition for R -> _)
+    // input: RcFn<R, A>; func: A -> RcFn<R, B>; result: RcFn<R, B>
+    impl<R, A, B: 'static> Bind<A, B> for RcFnKind<R>
+    where
+        R: 'static + Clone,
+        A: 'static,
+        Self: Apply<A, B>,
+        Self: Kind<Of<A> = RcFn<R, A>>,
+        Self: Kind<Of<B> = RcFn<R, B>>,
+    {
+        /// Implements Kleisli composition for `RcFn<R, A>` and `A -> RcFn<R, B>`.
+        ///
+        /// The resulting `RcFn<R, B>`, when called with `r: R`:
+        /// 1. Calls `input(r.clone())` to get `a: A`.
+        /// 2. Calls `func(a)` to get `rcfn_r_b: RcFn<R, B>`.
+        /// 3. Calls `rcfn_r_b(r)` to get `b: B`.
+        fn bind(
+            input: Self::Of<A>,
+            func: impl FnMut(A) -> Self::Of<B> + Clone + 'static,
+        ) -> Self::Of<B> {
+            let inner = input.0.clone();
+            RcFn(Rc::new(move |r: R| {
+                let a_val = inner(r.clone());
+                let mut func_clone = func.clone();
+                let rcfn_r_b: RcFn<R, B> = func_clone(a_val);
+                rcfn_r_b.call(r)
+            }))
+        }
+    }
+
     impl<R, A, B: 'static> Bind<A, B> for CFnOnceKind<R>
     // Changed CFnOnceHKTMarker to CFnOnceKind
     where
@@ -300,6 +331,21 @@ pub mod kind {
             // mma is CFn<R, CFn<R,A>>. Changed Applied to Of
             // Bind<Self::Of<A>, A> means Bind<CFn<R,A>, A>
             <Self as Bind<Self::Of<A>, A>>::bind(mma, |ma: Self::Of<A>| ma) // Changed Applied to Of
+        }
+    }
+
+    impl<R, A> Monad<A> for RcFnKind<R>
+    where
+        R: 'static + Clone,
+        A: 'static + Clone, // required by Applicative<A> supertrait for RcFnKind<R>
+    {
+        /// Flattens `RcFn<R, RcFn<R, A>>` to `RcFn<R, A>`.
+        ///
+        /// Implemented via `bind` with the identity function `|ma: RcFn<R,A>| ma`.
+        /// Because `RcFn` is `Clone`, the inner type `A = RcFn<R, A>` satisfies
+        /// the `Clone` constraint that prevented this from working with `CFnKind`.
+        fn join(mma: Self::Of<Self::Of<A>>) -> Self::Of<A> {
+            <Self as Bind<Self::Of<A>, A>>::bind(mma, |ma: Self::Of<A>| ma)
         }
     }
 

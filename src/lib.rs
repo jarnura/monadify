@@ -8,7 +8,7 @@
 pub mod applicative;
 /// Provides the Kind-based `Apply` trait (an extension of `Functor`) and its implementations.
 pub mod apply;
-/// Defines `CFn` and `CFnOnce` for heap-allocated, callable function wrappers.
+/// Defines `CFn`, `RcFn`, and `CFnOnce` for heap-allocated, callable function wrappers.
 pub mod function;
 /// Provides the Kind-based `Functor` trait and its implementations.
 pub mod functor;
@@ -40,7 +40,7 @@ pub use profunctor::{Choice, Profunctor, Strong};
 pub use transformers::reader::MonadReader; // Points to transformers::reader::kind::MonadReader
 
 // Public re-exports of key structs/types (optional, but can be convenient)
-pub use function::{CFn, CFnOnce};
+pub use function::{CFn, CFnOnce, RcFn};
 pub use identity::Identity; // Points to identity::kind::Identity
 pub use transformers::reader::{Reader, ReaderT}; // Points to transformers::reader::kind::ReaderT etc.
 
@@ -53,6 +53,7 @@ pub use kind_based::kind::{
     Kind,
     Kind1, // Core Kind traits
     OptionKind,
+    RcFnKind,
     ResultKind,
     VecKind,
 }; // Changed from ReaderTHKTMarker
@@ -93,12 +94,12 @@ pub mod do_notation;
 ///
 /// # Limitations
 ///
-/// **`CFnKind` / `CFnOnceKind` are not supported.** `CFn` and `CFnOnce` are
-/// not `Clone` (they wrap `Box<dyn Fn(…)>`). Because the desugaring emits
-/// `(expr).clone()` on every monadic right-hand side, any `mdo!` block over
-/// these markers fails with `E0599` at depth ≥ 1. See
-/// `tests/kind/do_notation/cfn_unsupported.rs` and the `monadify-macros`
-/// documentation for the full explanation and the future `Rc`-backed lift.
+/// **`CFnKind` and `CFnOnceKind` are not supported** (not `Clone`; they wrap
+/// `Box<dyn Fn(…)>`). The desugaring emits `(expr).clone()` on every monadic
+/// right-hand side, which fails with `E0599` at depth ≥ 1.
+/// **`RcFnKind` is supported** — it is the `Clone`-able, shared-ownership
+/// sibling backed by `Rc<dyn Fn(…)>`. See `tests/kind/do_notation/cfn_unsupported.rs`
+/// for details.
 ///
 /// At most **one non-`Copy` external value may be captured per `mdo!` nesting
 /// level**. Because the desugaring emits nested `move` closures bound by

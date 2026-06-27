@@ -1,9 +1,14 @@
 use std::ops::Deref;
+use std::rc::Rc;
 
 /// Type alias for a boxed, dynamically dispatched, repeatable closure.
 /// `BFn<A, B>` is equivalent to `Box<dyn Fn(A) -> B + 'static>`.
 /// This represents a heap-allocated closure that can be called multiple times.
 type BFn<A, B> = Box<dyn Fn(A) -> B + 'static>;
+
+/// Type alias for an `Rc`-backed, dynamically dispatched, repeatable closure.
+/// `RFn<A, B>` is equivalent to `Rc<dyn Fn(A) -> B + 'static>`.
+type RFn<A, B> = Rc<dyn Fn(A) -> B + 'static>;
 
 /// Type alias for a boxed, dynamically dispatched, once-callable closure.
 /// `BFnOnce<A, B>` is equivalent to `Box<dyn FnOnce(A) -> B + 'static>`.
@@ -16,9 +21,10 @@ type BFnOnce<A, B> = Box<dyn FnOnce(A) -> B + 'static>;
 /// which is useful for storing them in structs or passing them as arguments
 /// where a concrete type is needed (e.g., in trait implementations like `Functor` for functions).
 ///
-/// `CFn` stands for "Clonable Function" or "Composable Function", though it's not inherently `Clone`
-/// unless the underlying boxed closure captures only `Clone` data (which `Box<dyn Fn>` doesn't guarantee).
-/// The primary purpose here is to provide a newtype wrapper.
+/// `CFn` wraps `Box<dyn Fn(A) -> B + 'static>` and is therefore **not** `Clone`
+/// (unique-ownership, box-backed). For a shared-ownership, cheaply-cloneable
+/// sibling, see [`RcFn`], which wraps `Rc<dyn Fn(A) -> B + 'static>` and
+/// implements `Clone` in O(1).
 ///
 /// # Examples
 /// ```
@@ -187,5 +193,115 @@ impl<A: 'static, B: 'static, C: 'static> std::ops::Shl<CFnOnce<A, B>> for CFnOnc
     type Output = CFnOnce<A, C>;
     fn shl(self, rhs: CFnOnce<A, B>) -> Self::Output {
         CFnOnce(compose_fn_once(rhs.0, self.0))
+    }
+}
+
+// ── RcFn ──────────────────────────────────────────────────────────────────────
+
+/// A Clone-able, shared-ownership function wrapper backed by
+/// `Rc<dyn Fn(A) -> B + 'static>`.
+///
+/// `RcFn<A, B>` is the **Clone-able, shared-ownership** sibling of [`CFn`].
+/// While [`CFn`] wraps `Box<dyn Fn(A) -> B + 'static>` and is therefore
+/// **not** `Clone`, `RcFn` wraps `Rc<dyn Fn(A) -> B + 'static>` and
+/// implements `Clone`. Cloning an `RcFn` bumps the `Rc` reference count
+/// in O(1) — the closure body is **not** duplicated.
+///
+/// Unlike `#[derive(Clone)]` (which would add bounds `A: Clone, B: Clone`),
+/// the `Clone` impl here only requires `Rc<dyn Fn(A)->B+'static>: Clone`,
+/// which is always satisfied regardless of `A` and `B`. This allows
+/// `RcFn<X, CFn<A,B>>` to be `Clone` even though `CFn<A,B>` is not.
+///
+/// This makes `RcFn` law-equivalent to a deep copy **only for
+/// referentially-transparent `Fn`** closures (no observable interior
+/// mutability such as `Cell`/`RefCell`). This is the same pattern
+/// [`crate::transformers::reader::ReaderT`] already uses internally with
+/// `Rc<dyn Fn>`.
+///
+/// # Examples
+/// ```
+/// use monadify::function::RcFn;
+///
+/// let f: RcFn<i32, i32> = RcFn::new(|x: i32| x + 1);
+/// let g = f.clone(); // O(1) — shares the underlying closure
+/// assert_eq!(f.call(3), 4);
+/// assert_eq!(g.call(3), 4);
+/// ```
+pub struct RcFn<A, B>(pub RFn<A, B>);
+
+/// Manual `Clone` impl that does NOT add `A: Clone` or `B: Clone` bounds.
+///
+/// `Rc<dyn Fn(A)->B+'static>` is always `Clone` (it just bumps the reference
+/// count), so we can implement `Clone for RcFn<A,B>` unconditionally.
+/// This means `RcFn<X, CFn<A,B>>` is `Clone` even though `CFn<A,B>` is not.
+impl<A, B> Clone for RcFn<A, B> {
+    fn clone(&self) -> Self {
+        RcFn(Rc::clone(&self.0))
+    }
+}
+
+impl<A, B> RcFn<A, B> {
+    /// Creates a new `RcFn` by wrapping the given closure in an `Rc`.
+    ///
+    /// # Parameters
+    /// - `f`: A closure that implements `Fn(A) -> B` and is `'static`.
+    ///
+    /// # Returns
+    /// A new `RcFn<A, B>` instance whose clone shares the same closure allocation.
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(A) -> B + 'static,
+    {
+        RcFn(Rc::new(f))
+    }
+
+    /// Calls the wrapped closure with `arg`.
+    ///
+    /// This method takes `&self`, so the same `RcFn` can be called multiple times.
+    ///
+    /// # Parameters
+    /// - `arg`: The argument of type `A` to pass to the closure.
+    ///
+    /// # Returns
+    /// The result of type `B` from calling the closure.
+    pub fn call(&self, arg: A) -> B {
+        // `self.0.as_ref()` coerces `&Rc<dyn Fn(A)->B>` → `&dyn Fn(A)->B`,
+        // which implements `Fn(A)->B` via the blanket `impl<F: Fn+?Sized> Fn for &F`.
+        (self.0.as_ref())(arg)
+    }
+}
+
+/// Allows `RcFn<A, B>` to be dereferenced to `&Rc<dyn Fn(A) -> B + 'static>`.
+impl<A, B> Deref for RcFn<A, B> {
+    type Target = Rc<dyn Fn(A) -> B + 'static>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// Implements `f >> g` (forward composition) for `RcFn`.
+/// `(self >> rhs)(x)` is equivalent to `rhs(self(x))`.
+/// `RcFn<A,B> >> RcFn<B,C>` results in `RcFn<A,C>`.
+impl<A: 'static, B: 'static, C: 'static> std::ops::Shr<RcFn<B, C>> for RcFn<A, B> {
+    type Output = RcFn<A, C>;
+    fn shr(self, rhs: RcFn<B, C>) -> Self::Output {
+        let f = self.0;
+        let g = rhs.0;
+        // Both `f` and `g` are owned `Rc<dyn Fn>` moved into the closure.
+        // Calling `f(x)` auto-derefs `Rc<dyn Fn(A)->B>` → `dyn Fn(A)->B`.
+        RcFn(Rc::new(move |x: A| g(f(x))))
+    }
+}
+
+/// Implements `g << f` (backward composition) for `RcFn`.
+/// `(self << rhs)(x)` is equivalent to `self(rhs(x))`.
+/// `RcFn<B,C> << RcFn<A,B>` results in `RcFn<A,C>`.
+impl<A: 'static, B: 'static, C: 'static> std::ops::Shl<RcFn<A, B>> for RcFn<B, C> {
+    type Output = RcFn<A, C>;
+    fn shl(self, rhs: RcFn<A, B>) -> Self::Output {
+        let f = rhs.0;
+        let g = self.0;
+        RcFn(Rc::new(move |x: A| g(f(x))))
     }
 }
