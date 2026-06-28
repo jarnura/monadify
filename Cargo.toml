@@ -48,3 +48,19 @@ required-features = ["do-notation"]
 [[example]]
 name = "list_comprehension"
 required-features = ["do-notation"]
+
+[[example]]
+name = "state_stack_machine"
+required-features = ["do-notation"]
+
+[[example]]
+name = "state_unique_id"
+required-features = ["do-notation"]
+
+[[example]]
+name = "state_rng_lcg"
+required-features = ["do-notation"]
+
+[[example]]
+name = "state_bank_account"
+required-features = ["do-notation"]
