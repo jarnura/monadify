@@ -5,10 +5,11 @@
 //! [`lift`](MonadTrans::lift), which embeds an inner computation `m a` into the
 //! transformed monad `T m a` while adding *no* effect of its own.
 //!
-//! This crate implements `MonadTrans` for all three transformers:
+//! This crate implements `MonadTrans` for all four transformers:
 //! [`ReaderTKind`](crate::transformers::reader::ReaderTKind),
-//! [`StateTKind`](crate::transformers::state::StateTKind), and
-//! [`WriterTKind`](crate::transformers::writer::WriterTKind).
+//! [`StateTKind`](crate::transformers::state::StateTKind),
+//! [`WriterTKind`](crate::transformers::writer::WriterTKind), and
+//! [`ExceptTKind`](crate::transformers::except::ExceptTKind).
 //!
 //! ## Law
 //!
@@ -40,6 +41,7 @@
 use crate::functor::kind as functor_kind;
 use crate::kind_based::kind::{Kind, Kind1};
 use crate::monoid::Monoid;
+use crate::transformers::except::kind::{ExceptT, ExceptTKind};
 use crate::transformers::reader::kind::{ReaderT, ReaderTKind};
 use crate::transformers::state::kind::{StateT, StateTKind};
 use crate::transformers::writer::kind::{WriterT, WriterTKind};
@@ -106,5 +108,22 @@ where
         let paired: MKind::Of<(A, W)> =
             <MKind as functor_kind::Functor<A, (A, W)>>::map(inner, move |a| (a, W::empty()));
         WriterT::new(paired)
+    }
+}
+
+// `ExceptT`: wrap the inner value on the success branch with `Ok`. No `Clone`
+// needed — the inner value is consumed exactly once (like `WriterT`).
+impl<E, MKind, A> MonadTrans<A, MKind> for ExceptTKind<E, MKind>
+where
+    E: 'static,
+    A: 'static,
+    MKind: functor_kind::Functor<A, Result<A, E>> + Kind1 + 'static,
+    MKind::Of<A>: 'static,
+    MKind::Of<Result<A, E>>: 'static,
+{
+    fn lift(inner: MKind::Of<A>) -> ExceptT<E, MKind, A> {
+        let wrapped: MKind::Of<Result<A, E>> =
+            <MKind as functor_kind::Functor<A, Result<A, E>>>::map(inner, Ok);
+        ExceptT::new(wrapped)
     }
 }

@@ -91,3 +91,43 @@ fn writer_lift_over_option_none() {
     let lifted = <WKind as MonadTrans<i32, OptionKind>>::lift(None);
     assert_eq!(lifted.run_writer_t, None);
 }
+
+// ── ExceptT: lift wraps the inner value on the success (Ok) branch ───────────
+
+#[test]
+fn except_lift_wraps_ok() {
+    use monadify::transformers::except::{Except, ExceptTKind};
+    type EKind = ExceptTKind<String, IdentityKind>;
+    let lifted: Except<String, i32> =
+        <EKind as MonadTrans<i32, IdentityKind>>::lift(IdentityKind::pure(7));
+    let Identity(r) = lifted.run_except_t;
+    assert_eq!(r, Ok(7)); // lifting adds no error
+}
+
+#[test]
+fn except_lift_equals_pure() {
+    use monadify::transformers::except::{Except, ExceptTKind};
+    type EKind = ExceptTKind<String, IdentityKind>;
+    let lifted: Except<String, i32> =
+        <EKind as MonadTrans<i32, IdentityKind>>::lift(IdentityKind::pure(6));
+    let pured: Except<String, i32> = EKind::pure(6);
+    assert_eq!(lifted.run_except_t, pured.run_except_t);
+}
+
+#[test]
+fn except_lift_over_option_some() {
+    use monadify::transformers::except::ExceptTKind;
+    use monadify::OptionKind;
+    type EKind = ExceptTKind<String, OptionKind>;
+    let lifted = <EKind as MonadTrans<i32, OptionKind>>::lift(Some(11));
+    assert_eq!(lifted.run_except_t, Some(Ok(11)));
+}
+
+#[test]
+fn except_lift_over_option_none() {
+    use monadify::transformers::except::ExceptTKind;
+    use monadify::OptionKind;
+    type EKind = ExceptTKind<String, OptionKind>;
+    let lifted = <EKind as MonadTrans<i32, OptionKind>>::lift(None);
+    assert_eq!(lifted.run_except_t, None::<Result<i32, String>>);
+}

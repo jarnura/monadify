@@ -39,6 +39,7 @@ pub use apply::Apply; // Points to apply::kind::Apply
 pub use functor::Functor; // Points to functor::kind::Functor
 pub use monad::{Bind, Monad}; // Points to monad::kind::Bind and monad::kind::Monad
 pub use profunctor::{Choice, Profunctor, Strong};
+pub use transformers::except::MonadError; // Points to transformers::except::kind::MonadError
 pub use transformers::reader::MonadReader; // Points to transformers::reader::kind::MonadReader
 pub use transformers::state::MonadState; // Points to transformers::state::kind::MonadState
 pub use transformers::trans::MonadTrans; // Points to transformers::trans::MonadTrans
@@ -47,12 +48,14 @@ pub use transformers::writer::MonadWriter; // Points to transformers::writer::ki
 // Public re-exports of key structs/types (optional, but can be convenient)
 pub use function::{CFnOnce, RcFn};
 pub use identity::Identity; // Points to identity::kind::Identity
+pub use transformers::except::{Except, ExceptT}; // Points to transformers::except::kind::ExceptT etc.
 pub use transformers::reader::{Reader, ReaderT}; // Points to transformers::reader::kind::ReaderT etc.
 pub use transformers::state::{State, StateT}; // Points to transformers::state::kind::StateT etc.
 pub use transformers::writer::{Writer, WriterT}; // Points to transformers::writer::kind::WriterT etc.
 
 // Re-export Kind markers and core Kind traits by default
 pub use crate::identity::IdentityKind; // Changed from IdentityHKTMarker
+pub use crate::transformers::except::ExceptTKind;
 pub use crate::transformers::reader::ReaderTKind;
 pub use crate::transformers::state::StateTKind;
 pub use crate::transformers::writer::WriterTKind;
