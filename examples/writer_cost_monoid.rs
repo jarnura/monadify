@@ -11,7 +11,7 @@
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
 use monadify::monoid::{Monoid, Semigroup};
-use monadify::transformers::writer::{MonadWriter, Writer, WriterTKind};
+use monadify::transformers::writer::{Writer, WriterTKind};
 
 // ── User-defined monoid ───────────────────────────────────────────────────────
 
@@ -49,7 +49,7 @@ type WKind = WriterTKind<Sum, IdentityKind>;
 
 /// Record a cost of `n` units, appending `Sum(n)` to the log and yielding unit.
 fn charge(n: u64) -> Costed<()> {
-    <WKind as MonadWriter<Sum, (), IdentityKind>>::tell(Sum(n))
+    WKind::tell(Sum(n))
 }
 
 // ── Programs ──────────────────────────────────────────────────────────────────

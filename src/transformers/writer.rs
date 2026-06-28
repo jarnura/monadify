@@ -78,9 +78,7 @@ pub mod kind {
     pub struct WriterT<W, MKind: Kind1, A> {
         /// The wrapped inner computation: `MKind::Of<(A, W)>` (value-then-log).
         pub run_writer_t: MKind::Of<(A, W)>,
-        _phantom_w: PhantomData<W>,
-        _phantom_m_kind: PhantomData<MKind>,
-        _phantom_a: PhantomData<A>,
+        _phantom: PhantomData<(W, MKind, A)>,
     }
 
     // Manual `Clone` bounded on the projected inner type (mirrors `RcFn`): a
@@ -93,21 +91,18 @@ pub mod kind {
         fn clone(&self) -> Self {
             WriterT {
                 run_writer_t: self.run_writer_t.clone(),
-                _phantom_w: PhantomData,
-                _phantom_m_kind: PhantomData,
-                _phantom_a: PhantomData,
+                _phantom: PhantomData,
             }
         }
     }
 
     impl<W, MKind: Kind1, A> WriterT<W, MKind, A> {
         /// Creates a new `WriterT` from an inner value `MKind::Of<(A, W)>`.
+        #[must_use]
         pub fn new(inner: MKind::Of<(A, W)>) -> Self {
             WriterT {
                 run_writer_t: inner,
-                _phantom_w: PhantomData,
-                _phantom_m_kind: PhantomData,
-                _phantom_a: PhantomData,
+                _phantom: PhantomData,
             }
         }
     }
@@ -148,6 +143,7 @@ pub mod kind {
         /// let Identity(((), log)) = w.run_writer_t;
         /// assert_eq!(log, "hello");
         /// ```
+        #[must_use]
         pub fn tell(w: W) -> WriterT<W, MKindImpl, ()>
         where
             W: 'static,
@@ -174,6 +170,7 @@ pub mod kind {
         /// let Identity((val, log)) = w.run_writer_t;
         /// assert_eq!((val, log), (42, "note".to_string()));
         /// ```
+        #[must_use]
         pub fn writer<A>(value: A, log: W) -> WriterT<W, MKindImpl, A>
         where
             W: 'static,
@@ -354,6 +351,7 @@ pub mod kind {
     impl<W, MKind: Kind1, A> WriterT<W, MKind, A> {
         /// Runs the computation and keeps only the produced value, discarding
         /// the log: `MKind::Of<A>` (inner `Functor`, projecting `fst`).
+        #[must_use]
         pub fn eval_writer_t(self) -> MKind::Of<A>
         where
             W: 'static,
@@ -366,6 +364,7 @@ pub mod kind {
 
         /// Runs the computation and keeps only the accumulated log, discarding
         /// the value: `MKind::Of<W>` (inner `Functor`, projecting `snd`).
+        #[must_use]
         pub fn exec_writer_t(self) -> MKind::Of<W>
         where
             W: 'static,
@@ -393,6 +392,7 @@ pub mod kind {
         /// assert_eq!(exposed, "xyz");
         /// assert_eq!(log, "xyz");
         /// ```
+        #[must_use]
         pub fn listen(self) -> WriterT<W, MKind, (A, W)>
         where
             W: Clone + 'static,
@@ -420,6 +420,7 @@ pub mod kind {
         /// let Identity(((), log)) = w.censor(|s: String| s.to_uppercase()).run_writer_t;
         /// assert_eq!(log, "QUIET");
         /// ```
+        #[must_use]
         pub fn censor<F>(self, f: F) -> Self
         where
             W: 'static,
@@ -452,6 +453,7 @@ pub mod kind {
         Self: Sized,
     {
         /// Appends `w` to the log, producing unit: `((), w)`. The primitive.
+        #[must_use]
         fn tell(w: W) -> WriterT<W, MKind, ()>
         where
             W: 'static,
@@ -459,6 +461,7 @@ pub mod kind {
             MKind::Of<((), W)>: 'static;
 
         /// The general constructor: embeds a `(value, log)` pair directly.
+        #[must_use]
         fn writer(value: A, log: W) -> WriterT<W, MKind, A>
         where
             W: 'static,
@@ -468,6 +471,7 @@ pub mod kind {
 
         /// Exposes the accumulated log alongside the value, leaving it in place:
         /// turns a `WriterT<W, M, A>` into `WriterT<W, M, (A, W)>` with the same log.
+        #[must_use]
         fn listen(m: WriterT<W, MKind, A>) -> WriterT<W, MKind, (A, W)>
         where
             W: Clone + 'static,
@@ -478,6 +482,7 @@ pub mod kind {
 
         /// Rewrites the log with `f`, leaving the value unchanged: `(a, f(w))`.
         /// (The ergonomic specialization of Haskell's `pass`.)
+        #[must_use]
         fn censor<F>(f: F, m: WriterT<W, MKind, A>) -> WriterT<W, MKind, A>
         where
             W: 'static,

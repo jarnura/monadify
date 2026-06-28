@@ -60,6 +60,7 @@ pub mod kind {
         /// # Returns
         /// A new Kind-structured value `Self::Of<B>` containing the result(s) of
         /// applying `func`.
+        #[must_use]
         fn map(input: Self::Of<A>, func: impl FnMut(A) -> B + Clone + 'static) -> Self::Of<B>;
     }
 

@@ -59,6 +59,7 @@ use crate::transformers::writer::kind::{WriterT, WriterTKind};
 /// - `MKind`: the Kind marker of the inner monad.
 pub trait MonadTrans<A, MKind: Kind1>: Kind {
     /// Embeds `inner: MKind::Of<A>` into the transformer `Self::Of<A>`.
+    #[must_use]
     fn lift(inner: MKind::Of<A>) -> Self::Of<A>;
 }
 

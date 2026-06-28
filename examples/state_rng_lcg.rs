@@ -9,7 +9,7 @@ use monadify::applicative::kind::Applicative;
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
 use monadify::monad::kind::Bind;
-use monadify::transformers::state::{MonadState, State, StateTKind};
+use monadify::transformers::state::{State, StateTKind};
 
 /// Type alias: a stateful computation that threads a `u64` LCG seed.
 /// `State<S, A> = StateT<S, IdentityKind, A>`.
@@ -24,7 +24,7 @@ const ADD: u64 = 1442695040888963407;
 
 /// Advance the LCG seed and return the new seed as the produced value.
 fn next_u64() -> Rng<u64> {
-    <SKind as MonadState<u64, u64, IdentityKind>>::state(|seed| {
+    SKind::state(|seed| {
         let s2 = seed.wrapping_mul(MUL).wrapping_add(ADD);
         (s2, s2)
     })

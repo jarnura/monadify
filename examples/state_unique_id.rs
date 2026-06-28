@@ -8,7 +8,7 @@
 
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
-use monadify::transformers::state::{MonadState, State, StateTKind};
+use monadify::transformers::state::{State, StateTKind};
 
 /// Type alias: a stateful computation that threads a `u64` counter and produces `A`.
 /// `State<S, A>` = `StateT<S, IdentityKind, A>`.
@@ -20,7 +20,7 @@ type SKind = StateTKind<u64, IdentityKind>;
 /// Allocates a fresh id: returns the current counter as the id, then advances
 /// the counter by one.  `state(|n| (n, n + 1))` means "value = n, new_state = n + 1".
 fn fresh() -> Gen<u64> {
-    <SKind as MonadState<u64, u64, IdentityKind>>::state(|n| (n, n + 1))
+    SKind::state(|n| (n, n + 1))
 }
 
 /// Assigns monotonically-increasing unique ids to the three labels in a single

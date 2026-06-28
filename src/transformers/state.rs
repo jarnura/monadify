@@ -44,7 +44,7 @@ pub mod kind {
     //!
     //! ## Example
     //! ```
-    //! use monadify::transformers::state::{State, StateT, StateTKind, MonadState};
+    //! use monadify::transformers::state::{State, StateT, StateTKind};
     //! use monadify::IdentityKind;
     //! use monadify::Identity;
     //! use monadify::applicative::kind::Applicative;
@@ -61,10 +61,10 @@ pub mod kind {
     //!
     //! // `get` then `put`: read the state, store `x + 5`, return the original `x`.
     //! let prog: Counter<i32> = CounterKind::bind(
-    //!     <CounterKind as MonadState<i32, i32, IdentityKind>>::get(),
+    //!     CounterKind::get(),
     //!     |x| {
     //!         CounterKind::bind(
-    //!             <CounterKind as MonadState<i32, (), IdentityKind>>::put(x + 5),
+    //!             CounterKind::put(x + 5),
     //!             move |_| CounterKind::pure(x),
     //!         )
     //!     },
@@ -74,7 +74,7 @@ pub mod kind {
     //!
     //! // Runners: project just the value or just the final state.
     //! let again: Counter<i32> =
-    //!     <CounterKind as MonadState<i32, i32, IdentityKind>>::state(|s| (s * 2, s + 100));
+    //!     CounterKind::state(|s| (s * 2, s + 100));
     //! assert_eq!(again.clone().eval_state_t(3), Identity(6));
     //! assert_eq!(again.exec_state_t(3), Identity(103));
     //! ```
@@ -106,22 +106,19 @@ pub mod kind {
         // The boxed-`Fn` carrier is inherent to the encoding (mirrors ReaderT).
         #[allow(clippy::type_complexity)]
         pub run_state_t: Rc<dyn Fn(S) -> MKind::Of<(A, S)> + 'static>,
-        _phantom_s: PhantomData<S>,
-        _phantom_m_kind: PhantomData<MKind>,
-        _phantom_a: PhantomData<A>,
+        _phantom: PhantomData<(S, MKind, A)>,
     }
 
     impl<S, MKind: Kind1, A> StateT<S, MKind, A> {
         /// Creates a new `StateT` from a function `S -> MKind::Of<(A, S)>`.
+        #[must_use]
         pub fn new<F>(f: F) -> Self
         where
             F: Fn(S) -> MKind::Of<(A, S)> + 'static,
         {
             StateT {
                 run_state_t: Rc::new(f),
-                _phantom_s: PhantomData,
-                _phantom_m_kind: PhantomData,
-                _phantom_a: PhantomData,
+                _phantom: PhantomData,
             }
         }
     }
@@ -312,6 +309,7 @@ pub mod kind {
     impl<S, MKind: Kind1, A> StateT<S, MKind, A> {
         /// Runs the computation and keeps only the produced value, discarding
         /// the final state: `MKind::Of<A>` (inner `Functor`, projecting `fst`).
+        #[must_use]
         pub fn eval_state_t(self, s: S) -> MKind::Of<A>
         where
             S: Clone + 'static,
@@ -324,6 +322,7 @@ pub mod kind {
 
         /// Runs the computation and keeps only the final state, discarding the
         /// value: `MKind::Of<S>` (inner `Functor`, projecting `snd`).
+        #[must_use]
         pub fn exec_state_t(self, s: S) -> MKind::Of<S>
         where
             S: Clone + 'static,
@@ -353,6 +352,7 @@ pub mod kind {
     {
         /// Embeds a pure state transition `S -> (A, S)`. The primitive from which
         /// `get`/`put`/`modify`/`gets` derive.
+        #[must_use]
         fn state<F>(f: F) -> StateT<S, MKind, A>
         where
             S: Clone + 'static,
@@ -362,6 +362,7 @@ pub mod kind {
             F: Fn(S) -> (A, S) + 'static;
 
         /// Reads the whole state as the value, leaving it unchanged: `s -> (s, s)`.
+        #[must_use]
         fn get() -> StateT<S, MKind, S>
         where
             S: Clone + 'static,
@@ -369,6 +370,7 @@ pub mod kind {
             MKind::Of<(S, S)>: 'static;
 
         /// Replaces the state, returning unit: `_ -> ((), new_state)`.
+        #[must_use]
         fn put(new_state: S) -> StateT<S, MKind, ()>
         where
             S: Clone + 'static,
@@ -376,6 +378,7 @@ pub mod kind {
             MKind::Of<((), S)>: 'static;
 
         /// Applies `f` to the state, returning unit: `s -> ((), f(s))`.
+        #[must_use]
         fn modify<F>(f: F) -> StateT<S, MKind, ()>
         where
             S: Clone + 'static,
@@ -385,6 +388,7 @@ pub mod kind {
 
         /// Projects the state through `f` as the value, leaving the state
         /// unchanged: `s -> (f(s), s)`.
+        #[must_use]
         fn gets<F, B>(f: F) -> StateT<S, MKind, B>
         where
             S: Clone + 'static,
@@ -472,6 +476,7 @@ pub mod kind {
         /// `<StateTKind<S, M> as MonadState<S, A, M>>::state(f)`.
         /// The generic [`MonadState`] trait stays for code that is generic
         /// over the transformer.
+        #[must_use]
         pub fn state<F, A>(f: F) -> StateT<S, MKindImpl, A>
         where
             S: Clone + 'static,
@@ -490,6 +495,7 @@ pub mod kind {
         /// `<StateTKind<S, M> as MonadState<S, S, M>>::get()`.
         /// The generic [`MonadState`] trait stays for code that is generic
         /// over the transformer.
+        #[must_use]
         pub fn get() -> StateT<S, MKindImpl, S>
         where
             S: Clone + 'static,
@@ -507,6 +513,7 @@ pub mod kind {
         /// `<StateTKind<S, M> as MonadState<S, (), M>>::put(s)`.
         /// The generic [`MonadState`] trait stays for code that is generic
         /// over the transformer.
+        #[must_use]
         pub fn put(new_state: S) -> StateT<S, MKindImpl, ()>
         where
             S: Clone + 'static,
@@ -524,6 +531,7 @@ pub mod kind {
         /// `<StateTKind<S, M> as MonadState<S, (), M>>::modify(f)`.
         /// The generic [`MonadState`] trait stays for code that is generic
         /// over the transformer.
+        #[must_use]
         pub fn modify<F>(f: F) -> StateT<S, MKindImpl, ()>
         where
             S: Clone + 'static,
@@ -542,6 +550,7 @@ pub mod kind {
         /// `<StateTKind<S, M> as MonadState<S, B, M>>::gets(f)`.
         /// The generic [`MonadState`] trait stays for code that is generic
         /// over the transformer.
+        #[must_use]
         pub fn gets<F, B>(f: F) -> StateT<S, MKindImpl, B>
         where
             S: Clone + 'static,

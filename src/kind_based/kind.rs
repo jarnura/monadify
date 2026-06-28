@@ -70,7 +70,7 @@ impl<E> ResultKind<E> {
     /// Creates a new marker for `Result<_, E>`.
     /// This is primarily for type inference or explicit construction if needed,
     /// though often `Default::default()` or type inference is sufficient.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         ResultKind(std::marker::PhantomData)
     }
 }

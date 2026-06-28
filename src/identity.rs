@@ -52,6 +52,7 @@ pub mod kind {
     ///
     /// This is the core data type for the `Identity` monad. It doesn't add
     /// any special context other than simply containing the value.
+    #[must_use]
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct Identity<A>(pub A);
 
