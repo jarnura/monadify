@@ -96,11 +96,11 @@ and `cargo test --all-features`. CI (`.github/workflows/rust.yml`) mirrors these
 separate jobs — `fmt`, `clippy` (`--all-features -- -D warnings`), `test` (default +
 `legacy` feature matrix, incl. doc-tests), and an `msrv` job checking against Rust
 1.66. The `clippy` job also lints `--benches` so `benches/compare.rs` can't
-silently rot. `clippy --all-targets --all-features -- -D warnings` is now **clean**
-across the whole tree (the historical ~50 auto-fixable test lints have been
-removed) though CI still runs `clippy` without `--all-targets`. The one remaining
-gap is `cargo doc -D warnings` (~11 rustdoc link warnings, mostly unresolved
-`Semigroup`/`Monoid` intra-doc links + redundant explicit link targets).
+silently rot. Both `clippy --all-targets --all-features -- -D warnings` and
+`cargo doc --no-deps --all-features` are now **clean** across the whole tree (the
+historical ~50 auto-fixable test lints and the ~11 rustdoc link warnings have all
+been fixed), though CI still runs `clippy` without `--all-targets` and does not yet
+run a `cargo doc` gate — wiring those into CI is the remaining hardening step.
 
 ```bash
 cargo test                  # default kind-based suite

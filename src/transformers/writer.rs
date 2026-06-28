@@ -15,7 +15,7 @@ pub mod kind {
     //! needs only an inner [`Apply`](apply_kind::Apply), because two independent
     //! computations' logs are simply *combined* — there is no sequential data
     //! dependency like `StateT`'s threaded state. The new ingredient is that the
-    //! log type `W` must be a [`Monoid`](crate::monoid::Monoid): [`pure`](applicative_kind::Applicative::pure)
+    //! log type `W` must be a [`Monoid`]: [`pure`](applicative_kind::Applicative::pure)
     //! seeds the log with [`Monoid::empty`], and every sequencing step
     //! [`combine`](crate::monoid::Semigroup::combine)s the two logs.
     //!
@@ -71,7 +71,7 @@ pub mod kind {
     /// is stored in [`run_writer_t`](Self::run_writer_t).
     ///
     /// # Type Parameters
-    /// - `W`: the log type (must be a [`Monoid`](crate::monoid::Monoid) for the
+    /// - `W`: the log type (must be a [`Monoid`] for the
     ///   `Applicative`/`Monad` instances).
     /// - `MKind`: the Kind marker for the inner monad (must implement [`Kind1`]).
     /// - `A`: the value produced alongside the log.

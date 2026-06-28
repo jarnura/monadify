@@ -1,9 +1,9 @@
 //! # Semigroup and Monoid
 //!
-//! Algebraic structures for *combinable* values. A [`Semigroup`] has an
-//! associative binary operation [`combine`](Semigroup::combine) (Haskell's
-//! `<>` / `mappend`); a [`Monoid`] additionally has an identity element
-//! [`empty`](Monoid::empty) (Haskell's `mempty`).
+//! Algebraic structures for *combinable* values. A [`Semigroup`](crate::monoid::Semigroup) has an
+//! associative binary operation [`combine`](crate::monoid::Semigroup::combine) (Haskell's
+//! `<>` / `mappend`); a [`Monoid`](crate::monoid::Monoid) additionally has an identity element
+//! [`empty`](crate::monoid::Monoid::empty) (Haskell's `mempty`).
 //!
 //! These power the [`WriterT`](crate::transformers::writer) transformer, whose
 //! log type must accumulate monoidally: `tell` appends with `combine`, and

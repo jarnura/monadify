@@ -6,10 +6,10 @@
 //! transformed monad `T m a` while adding *no* effect of its own.
 //!
 //! This crate implements `MonadTrans` for all four transformers:
-//! [`ReaderTKind`](crate::transformers::reader::ReaderTKind),
-//! [`StateTKind`](crate::transformers::state::StateTKind),
-//! [`WriterTKind`](crate::transformers::writer::WriterTKind), and
-//! [`ExceptTKind`](crate::transformers::except::ExceptTKind).
+//! [`ReaderTKind`],
+//! [`StateTKind`],
+//! [`WriterTKind`], and
+//! [`ExceptTKind`].
 //!
 //! ## Law
 //!
@@ -24,13 +24,12 @@
 //!
 //! ## Example
 //! ```
-//! use monadify::transformers::trans::MonadTrans;
 //! use monadify::transformers::writer::{Writer, WriterTKind};
 //! use monadify::{Applicative, Identity, IdentityKind};
 //!
 //! // Lift a pure inner `Identity(7)` into a `Writer<String, _>` — empty log.
 //! type W<A> = Writer<String, A>;
-//! let lifted: W<i32> = <WriterTKind<String, IdentityKind> as MonadTrans<i32, IdentityKind>>::lift(
+//! let lifted: W<i32> = WriterTKind::<String, IdentityKind>::lift(
 //!     IdentityKind::pure(7),
 //! );
 //! let Identity((v, log)) = lifted.run_writer_t;
@@ -49,7 +48,7 @@ use crate::transformers::writer::kind::{WriterT, WriterTKind};
 /// Lifts an inner monadic computation into a monad transformer.
 ///
 /// `Self` is the transformer's Kind marker (e.g.
-/// [`WriterTKind`](crate::transformers::writer::WriterTKind)); `MKind` is the
+/// [`WriterTKind`]); `MKind` is the
 /// inner monad's marker. [`lift`](Self::lift) maps `MKind::Of<A>` to
 /// `Self::Of<A>`, adding none of the transformer's own effect (an empty log,
 /// an unchanged state, an ignored environment).
@@ -126,5 +125,95 @@ where
         let wrapped: MKind::Of<Result<A, E>> =
             <MKind as functor_kind::Functor<A, Result<A, E>>>::map(inner, Ok);
         ExceptT::new(wrapped)
+    }
+}
+
+// ── Inherent ergonomic `lift` helpers ──────────────────────────────────────
+//
+// These delegate to the `MonadTrans` trait and expose the concrete shorthand
+// `RKind::lift(inner)` instead of the verbose UFCS form.  The trait impls
+// remain the canonical implementation and are still the right choice for
+// code that is generic over the transformer marker.
+
+impl<R, MKind: Kind1> ReaderTKind<R, MKind> {
+    /// Ergonomic inherent form of [`MonadTrans::lift`] for [`ReaderT`].
+    ///
+    /// Embeds an inner computation `MKind::Of<A>` into a `ReaderT<R, MKind, A>`,
+    /// ignoring the environment and adding no effect of its own. This is the
+    /// concrete shorthand for
+    /// `<ReaderTKind<R, MKind> as MonadTrans<A, MKind>>::lift(inner)`;
+    /// the trait form remains available for generic code.
+    #[must_use]
+    pub fn lift<A>(inner: MKind::Of<A>) -> ReaderT<R, MKind, A>
+    where
+        R: 'static,
+        A: 'static,
+        MKind: 'static,
+        MKind::Of<A>: Clone + 'static,
+    {
+        <Self as MonadTrans<A, MKind>>::lift(inner)
+    }
+}
+
+impl<S, MKind: Kind1> StateTKind<S, MKind> {
+    /// Ergonomic inherent form of [`MonadTrans::lift`] for [`StateT`].
+    ///
+    /// Embeds an inner computation `MKind::Of<A>` into a `StateT<S, MKind, A>`,
+    /// threading the state through unchanged and adding no effect of its own.
+    /// This is the concrete shorthand for
+    /// `<StateTKind<S, MKind> as MonadTrans<A, MKind>>::lift(inner)`;
+    /// the trait form remains available for generic code.
+    #[must_use]
+    pub fn lift<A>(inner: MKind::Of<A>) -> StateT<S, MKind, A>
+    where
+        S: Clone + 'static,
+        A: 'static,
+        MKind: functor_kind::Functor<A, (A, S)> + 'static,
+        MKind::Of<A>: Clone + 'static,
+        MKind::Of<(A, S)>: 'static,
+    {
+        <Self as MonadTrans<A, MKind>>::lift(inner)
+    }
+}
+
+impl<W, MKind: Kind1> WriterTKind<W, MKind> {
+    /// Ergonomic inherent form of [`MonadTrans::lift`] for [`WriterT`].
+    ///
+    /// Embeds an inner computation `MKind::Of<A>` into a `WriterT<W, MKind, A>`,
+    /// pairing the value with an empty log and adding no effect of its own. This
+    /// is the concrete shorthand for
+    /// `<WriterTKind<W, MKind> as MonadTrans<A, MKind>>::lift(inner)`;
+    /// the trait form remains available for generic code.
+    #[must_use]
+    pub fn lift<A>(inner: MKind::Of<A>) -> WriterT<W, MKind, A>
+    where
+        W: Monoid + 'static,
+        A: 'static,
+        MKind: functor_kind::Functor<A, (A, W)> + 'static,
+        MKind::Of<A>: 'static,
+        MKind::Of<(A, W)>: 'static,
+    {
+        <Self as MonadTrans<A, MKind>>::lift(inner)
+    }
+}
+
+impl<E, MKind: Kind1> ExceptTKind<E, MKind> {
+    /// Ergonomic inherent form of [`MonadTrans::lift`] for [`ExceptT`].
+    ///
+    /// Embeds an inner computation `MKind::Of<A>` into an `ExceptT<E, MKind, A>`,
+    /// wrapping the value on the success (`Ok`) branch and adding no effect of
+    /// its own. This is the concrete shorthand for
+    /// `<ExceptTKind<E, MKind> as MonadTrans<A, MKind>>::lift(inner)`;
+    /// the trait form remains available for generic code.
+    #[must_use]
+    pub fn lift<A>(inner: MKind::Of<A>) -> ExceptT<E, MKind, A>
+    where
+        E: 'static,
+        A: 'static,
+        MKind: functor_kind::Functor<A, Result<A, E>> + 'static,
+        MKind::Of<A>: 'static,
+        MKind::Of<Result<A, E>>: 'static,
+    {
+        <Self as MonadTrans<A, MKind>>::lift(inner)
     }
 }

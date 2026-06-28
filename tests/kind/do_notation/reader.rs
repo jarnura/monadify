@@ -47,7 +47,7 @@ use monadify::applicative::kind::Applicative;
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
 use monadify::monad::kind::Bind;
-use monadify::transformers::reader::{MonadReader, Reader, ReaderT, ReaderTKind};
+use monadify::transformers::reader::{Reader, ReaderT, ReaderTKind};
 use proptest::prelude::*;
 
 /// A minimal read-only configuration environment used throughout these tests.
@@ -66,7 +66,7 @@ type ConfigReader<A> = Reader<Config, A>;
 
 /// Helper: call `ask()` pinned to `Config` / `IdentityKind` so tests are less verbose.
 fn ask_env() -> ConfigReader<Config> {
-    <ReaderKind as MonadReader<Config, Config, IdentityKind>>::ask()
+    ReaderKind::ask()
 }
 
 /// Helper: run a `ConfigReader<i32>` against a `Config` and unwrap the `Identity`.
@@ -416,14 +416,10 @@ fn reader_mdo_local_doubles_factor_for_inner_computation() {
     let read_factor: ConfigReader<i32> = ReaderT::new(|cfg: Config| Identity(cfg.factor));
 
     // Wrap it so its env has `factor` doubled.
-    let doubled_factor: ConfigReader<i32> =
-        <ReaderKind as MonadReader<Config, i32, IdentityKind>>::local(
-            |mut cfg: Config| {
-                cfg.factor *= 2;
-                cfg
-            },
-            read_factor,
-        );
+    let doubled_factor: ConfigReader<i32> = read_factor.local(|mut cfg: Config| {
+        cfg.factor *= 2;
+        cfg
+    });
 
     // In the do-block:
     //   `original` reads from the REAL env (factor = 5)
@@ -451,13 +447,10 @@ fn reader_mdo_local_doubles_factor_for_inner_computation() {
 fn reader_mdo_local_only_affects_its_inner_computation() {
     // local inflates `base` × 100 for its wrapped computation
     let inflated_base: ConfigReader<i32> =
-        <ReaderKind as MonadReader<Config, i32, IdentityKind>>::local(
-            |mut cfg: Config| {
-                cfg.base *= 100;
-                cfg
-            },
-            ReaderT::new(|cfg: Config| Identity(cfg.base)),
-        );
+        ReaderT::new(|cfg: Config| Identity(cfg.base)).local(|mut cfg: Config| {
+            cfg.base *= 100;
+            cfg
+        });
 
     // Read `base` and `factor` together in one step so `inflated_base` (non-Copy)
     // is only referenced at depth 1 in the mdo expansion.  The bound tuple
@@ -481,13 +474,10 @@ fn reader_mdo_local_only_affects_its_inner_computation() {
 #[test]
 fn reader_mdo_local_negated_base_combined_with_original() {
     let negated_base: ConfigReader<i32> =
-        <ReaderKind as MonadReader<Config, i32, IdentityKind>>::local(
-            |mut cfg: Config| {
-                cfg.base = -cfg.base;
-                cfg
-            },
-            ReaderT::new(|cfg: Config| Identity(cfg.base)),
-        );
+        ReaderT::new(|cfg: Config| Identity(cfg.base)).local(|mut cfg: Config| {
+            cfg.base = -cfg.base;
+            cfg
+        });
 
     let computation: ConfigReader<i32> = mdo! {
         ReaderKind;

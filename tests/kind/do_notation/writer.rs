@@ -26,14 +26,14 @@ use monadify::applicative::kind::Applicative;
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
 use monadify::monad::kind::Bind;
-use monadify::transformers::writer::{MonadWriter, Writer, WriterTKind};
+use monadify::transformers::writer::{Writer, WriterTKind};
 use proptest::prelude::*;
 
 type WKind = WriterTKind<Vec<i32>, IdentityKind>;
 type Logged<A> = Writer<Vec<i32>, A>;
 
 fn tell(n: i32) -> Logged<()> {
-    <WKind as MonadWriter<Vec<i32>, (), IdentityKind>>::tell(vec![n])
+    WKind::tell(vec![n])
 }
 fn run_id<A>(w: Logged<A>) -> (A, Vec<i32>) {
     let Identity(pair) = w.run_writer_t;
@@ -59,7 +59,7 @@ fn writer_mdo_interleaves_values_and_log() {
     let comp: Logged<i32> = mdo! {
         WKind;
         _ <- tell(10);
-        x <- <WKind as MonadWriter<Vec<i32>, i32, IdentityKind>>::writer(5, vec![20]);
+        x <- WKind::writer(5, vec![20]);
         _ <- tell(30);
         WKind::pure(x + 1)
     };

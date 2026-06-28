@@ -36,13 +36,13 @@ fn assert_eq_at<A: PartialEq + std::fmt::Debug>(l: TestState<A>, r: TestState<A>
 }
 
 fn st_state<A: 'static, F: Fn(i32) -> (A, i32) + 'static>(f: F) -> TestState<A> {
-    <TestStateKind as MonadState<i32, A, IdentityKind>>::state(f)
+    TestStateKind::state(f)
 }
 fn st_get() -> TestState<i32> {
-    <TestStateKind as MonadState<i32, i32, IdentityKind>>::get()
+    TestStateKind::get()
 }
 fn st_put(s: i32) -> TestState<()> {
-    <TestStateKind as MonadState<i32, (), IdentityKind>>::put(s)
+    TestStateKind::put(s)
 }
 
 // ── Functor / Applicative / Apply / Bind / Monad smoke tests ────────────────
@@ -170,12 +170,12 @@ fn monadstate_put_put() {
 
 #[test]
 fn modify_and_gets_derive_correctly() {
-    let modify = <TestStateKind as MonadState<i32, (), IdentityKind>>::modify(|s| s + 100);
+    let modify = TestStateKind::modify(|s| s + 100);
     // modify(f) == get.bind(|s| put(f(s)))
     let derived_modify = TestStateKind::bind(st_get(), |s| st_put(s + 100));
     assert_eq_at(modify, derived_modify, 5);
 
-    let gets = <TestStateKind as MonadState<i32, i32, IdentityKind>>::gets(|s| s * 3);
+    let gets = TestStateKind::gets(|s| s * 3);
     // gets(f) == get.map(f)
     let derived_gets = TestStateKind::map(st_get(), |s| s * 3);
     assert_eq_at(gets, derived_gets, 5);
@@ -192,10 +192,8 @@ fn run_opt<A>(st: OptState<A>, s0: i32) -> Option<(A, i32)> {
 
 #[test]
 fn option_inner_threads_state_when_all_some() {
-    let m: OptState<i32> = <OptStateKind as MonadState<i32, i32, OptionKind>>::get();
-    let bound = OptStateKind::bind(m, |x| {
-        <OptStateKind as MonadState<i32, i32, OptionKind>>::state(move |s| (x + s, s + 1))
-    });
+    let m: OptState<i32> = OptStateKind::get();
+    let bound = OptStateKind::bind(m, |x| OptStateKind::state(move |s| (x + s, s + 1)));
     // get at 4 -> Some((4,4)); state from 4 -> Some((4+4, 5)) = Some((8,5))
     assert_eq!(run_opt(bound, 4), Some((8, 5)));
 }
@@ -204,16 +202,14 @@ fn option_inner_threads_state_when_all_some() {
 fn option_inner_none_short_circuits() {
     // A computation that fails inside the inner Option.
     let failing: OptState<i32> = StateT::new(|_s: i32| None);
-    let bound = OptStateKind::bind(failing, |x| {
-        <OptStateKind as MonadState<i32, i32, OptionKind>>::state(move |s| (x, s))
-    });
+    let bound = OptStateKind::bind(failing, |x| OptStateKind::state(move |s| (x, s)));
     assert_eq!(run_opt(bound, 10), None);
 }
 
 #[test]
 fn option_inner_monadstate_laws_hold() {
     // put-put last-write-wins over OptionKind.
-    let put = |s: i32| <OptStateKind as MonadState<i32, (), OptionKind>>::put(s);
+    let put = |s: i32| OptStateKind::put(s);
     let lhs = OptStateKind::bind(put(3), move |_| put(8));
     assert_eq!(run_opt(lhs.clone(), 0), run_opt(put(8), 0));
     assert_eq!(run_opt(lhs, 0), Some(((), 8)));

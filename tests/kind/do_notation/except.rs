@@ -24,17 +24,17 @@ use monadify::applicative::kind::Applicative;
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
 use monadify::monad::kind::Bind;
-use monadify::transformers::except::{Except, ExceptTKind, MonadError};
+use monadify::transformers::except::{Except, ExceptT, ExceptTKind};
 use proptest::prelude::*;
 
 type EKind = ExceptTKind<String, IdentityKind>;
 type Checked<A> = Except<String, A>;
 
 fn ok(n: i32) -> Checked<i32> {
-    <EKind as MonadError<String, i32, IdentityKind>>::lift_either(Ok(n))
+    ExceptT::ok(n)
 }
 fn boom(msg: &str) -> Checked<i32> {
-    <EKind as MonadError<String, i32, IdentityKind>>::throw_error(msg.to_string())
+    ExceptT::throw(msg.to_string())
 }
 fn run_id<A>(m: Checked<A>) -> Result<A, String> {
     let Identity(r) = m.run_except_t;

@@ -48,7 +48,7 @@ fn test_reader_t_kind_monad_bind() {
 fn test_monad_reader_kind_ask() {
     // Renamed test
     let ask_reader: ReaderT<EnvConfig, IdentityKind, EnvConfig> = // Changed IdentityHKTMarker
-        <TestReaderKind as MonadReader<EnvConfig, EnvConfig, IdentityKind>>::ask(); // Renamed Marker
+        TestReaderKind::ask(); // Renamed Marker
     let result = (ask_reader.run_reader_t)(EnvConfig { val: 7 });
     assert_eq!(result, Identity(EnvConfig { val: 7 }));
 }

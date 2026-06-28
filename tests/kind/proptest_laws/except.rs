@@ -19,7 +19,7 @@ use monadify::function::RcFn;
 use monadify::identity::{Identity, IdentityKind};
 use monadify::kind_based::kind::VecKind;
 use monadify::monad::kind::Bind;
-use monadify::transformers::except::{Except, ExceptT, ExceptTKind, MonadError};
+use monadify::transformers::except::{Except, ExceptT, ExceptTKind};
 use proptest::prelude::*;
 
 type E<A> = Except<String, A>;
@@ -35,10 +35,10 @@ fn run<A>(m: E<A>) -> Result<A, String> {
 fn arrow(slope: i32, intercept: i32, err: String) -> impl Fn(i32) -> E<i32> + Clone {
     move |x: i32| {
         if x == 0 {
-            <EKind as MonadError<String, i32, IdentityKind>>::throw_error(err.clone())
+            ExceptT::throw(err.clone())
         } else {
             let mut lf = linear_fn(slope, intercept);
-            <EKind as MonadError<String, i32, IdentityKind>>::lift_either(Ok(lf(x)))
+            ExceptT::ok(lf(x))
         }
     }
 }
@@ -90,21 +90,18 @@ proptest! {
     fn except_throw_left_zero(err in "[a-z]{1,8}", (sl, ic) in (any::<i32>(), any::<i32>())) {
         let k = arrow(sl, ic, "unused".to_string());
         let lhs = EKind::bind(
-            <EKind as MonadError<String, i32, IdentityKind>>::throw_error(err.clone()),
+            ExceptT::throw(err.clone()),
             k,
         );
-        let rhs = <EKind as MonadError<String, i32, IdentityKind>>::throw_error(err);
+        let rhs: E<i32> = ExceptT::throw(err);
         prop_assert_eq!(run(lhs), run(rhs));
     }
 
     /// catch-throw: `catch(throw(e), h) == h(e)`.
     #[test]
     fn except_catch_throw(err in "[a-z]{1,8}", n in any::<i32>()) {
-        let h = move |_e: String| <EKind as MonadError<String, i32, IdentityKind>>::lift_either(Ok(n));
-        let lhs = <EKind as MonadError<String, i32, IdentityKind>>::catch_error(
-            <EKind as MonadError<String, i32, IdentityKind>>::throw_error(err.clone()),
-            h,
-        );
+        let h = move |_e: String| ExceptT::ok(n);
+        let lhs = ExceptT::<String, IdentityKind, i32>::throw(err.clone()).catch(h);
         let rhs = h(err);
         prop_assert_eq!(run(lhs), run(rhs));
     }
@@ -112,8 +109,8 @@ proptest! {
     /// catch-pure: `catch(pure(a), h) == pure(a)` (handler never runs).
     #[test]
     fn except_catch_pure(a in any::<i32>()) {
-        let h = |_e: String| <EKind as MonadError<String, i32, IdentityKind>>::throw_error("ignored".to_string());
-        let lhs = <EKind as MonadError<String, i32, IdentityKind>>::catch_error(EKind::pure(a), h);
+        let h = |_e: String| ExceptT::<String, IdentityKind, i32>::throw("ignored".to_string());
+        let lhs = EKind::pure(a).catch(h);
         prop_assert_eq!(run(lhs), Ok(a));
     }
 }
