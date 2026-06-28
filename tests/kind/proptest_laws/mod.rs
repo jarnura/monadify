@@ -19,6 +19,7 @@ pub mod apply;
 pub mod functor;
 pub mod monad;
 pub mod rcfn;
+pub mod state;
 
 // --- Arbitrary strategies (reusable across the law-family modules) ---
 

@@ -38,15 +38,18 @@ pub use functor::Functor; // Points to functor::kind::Functor
 pub use monad::{Bind, Monad}; // Points to monad::kind::Bind and monad::kind::Monad
 pub use profunctor::{Choice, Profunctor, Strong};
 pub use transformers::reader::MonadReader; // Points to transformers::reader::kind::MonadReader
+pub use transformers::state::MonadState; // Points to transformers::state::kind::MonadState
 
 // Public re-exports of key structs/types (optional, but can be convenient)
 pub use function::{CFnOnce, RcFn};
 pub use identity::Identity; // Points to identity::kind::Identity
 pub use transformers::reader::{Reader, ReaderT}; // Points to transformers::reader::kind::ReaderT etc.
+pub use transformers::state::{State, StateT}; // Points to transformers::state::kind::StateT etc.
 
 // Re-export Kind markers and core Kind traits by default
 pub use crate::identity::IdentityKind; // Changed from IdentityHKTMarker
 pub use crate::transformers::reader::ReaderTKind;
+pub use crate::transformers::state::StateTKind;
 pub use kind_based::kind::{
     CFnOnceKind,
     Kind,
