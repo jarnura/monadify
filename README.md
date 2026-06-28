@@ -115,6 +115,24 @@ assert_eq!(result, Some(5));
 
 Run with: `cargo run --example validation --features do-notation`
 
+### State monad examples
+
+These demonstrate the `StateT` State monad threading state through a computation
+via `mdo!` do-notation — each `<-` bind both reads and updates the implicit state:
+
+- `state_stack_machine.rs` — RPN / stack calculator (state = the operand stack)
+- `state_unique_id.rs` — fresh-id / gensym generator (state = a counter)
+- `state_rng_lcg.rs` — deterministic LCG pseudo-random generator (state = the seed)
+- `state_bank_account.rs` — running-balance ledger (state = the balance)
+
+Run any of them with (each requires the `do-notation` feature):
+```bash
+cargo run --example state_stack_machine --features do-notation
+cargo run --example state_unique_id    --features do-notation
+cargo run --example state_rng_lcg      --features do-notation
+cargo run --example state_bank_account --features do-notation
+```
+
 **Limitations and notes**:
 - `pure` is a reserved free-call head inside `mdo!` blocks (rewritten to `Marker::pure`); use `::pure`-qualified or `.pure()` method syntax to bypass
 - `CFn` / `CFnOnce` unsupported (not `Clone`); use `RcFn` instead for a `Clone`-able, shared-ownership function monad
