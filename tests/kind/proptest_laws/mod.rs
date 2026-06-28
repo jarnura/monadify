@@ -20,6 +20,7 @@ pub mod functor;
 pub mod monad;
 pub mod rcfn;
 pub mod state;
+pub mod writer;
 
 // --- Arbitrary strategies (reusable across the law-family modules) ---
 

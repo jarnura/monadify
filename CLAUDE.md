@@ -11,7 +11,7 @@ plus profunctor-encoded optics. v0.1.1, MIT, edition 2021, MSRV 1.66.
 The defining design simulates **Higher-Kinded Types (HKTs)** using Generic
 Associated Types: a `Kind` trait with `type Of<Arg>` plus lightweight marker
 structs (`OptionKind`, `VecKind`, `ResultKind<E>`, `CFnKind<X>`, `CFnOnceKind<X>`,
-`RcFnKind<X>`, `IdentityKind`, `ReaderTKind`, `StateTKind`). Traits are generic over the *marker*, and
+`RcFnKind<X>`, `IdentityKind`, `ReaderTKind`, `StateTKind`, `WriterTKind`). Traits are generic over the *marker*, and
 `Self::Of<A>` resolves to the concrete type (e.g. `OptionKind::Of<i32> == Option<i32>`).
 Core infrastructure lives in `src/kind_based/kind.rs`.
 
@@ -26,18 +26,26 @@ Core infrastructure lives in `src/kind_based/kind.rs`.
 - `src/identity.rs` — `Identity` monad. `src/transformers/reader.rs` — `ReaderT` +
   `MonadReader` (`ask`/`local`). `src/transformers/state.rs` — `StateT` +
   `MonadState` (`state`/`get`/`put`/`modify`/`gets`) + runners
-  `run`/`eval`/`exec_state_t`. `src/utils.rs` — `fn0!`..`fn3!` macros.
+  `run`/`eval`/`exec_state_t`. `src/transformers/writer.rs` — `WriterT` +
+  `MonadWriter` (`tell`/`writer`/`listen`/`censor`) + runner `exec_writer_t`.
+  `src/transformers/trans.rs` — `MonadTrans` (`lift`, impl'd for all three
+  transformers). `src/monoid.rs` — `Semigroup`/`Monoid` (`combine`/`empty`).
+  `src/utils.rs` — `fn0!`..`fn3!` macros.
 - `src/legacy/` — the older associated-type implementation, behind the `legacy`
   feature flag (kept for comparison/benchmarking; not the default).
 - `tests/{kind,legacy}/` — law-verifying test suites. `benches/compare.rs` —
   criterion benchmarks comparing kind-based vs native vs legacy.
 
 Concrete instances implementing the full hierarchy (where lawful): `Option`,
-`Result`, `Vec`, `Identity`, `RcFn`, `CFnOnce`, `ReaderT`, `StateT`. `StateT`'s
+`Result`, `Vec`, `Identity`, `RcFn`, `CFnOnce`, `ReaderT`, `StateT`, `WriterT`. `StateT`'s
 `Apply`/`Bind`/`Monad` require the **inner** monad to be `Bind`/`Monad` (state is
 threaded — a sequential dependency), unlike `ReaderT` whose `Apply` needs only an
 inner `Apply`; its four `MonadState` laws (get-get, get-put, put-get, put-put) are
-first-class and law-tested.
+first-class and law-tested. `WriterT` is in the **`ReaderT` family** (its `Apply`
+needs only an inner `Apply`) but adds a `W: Monoid` constraint on the log: `pure`
+seeds the log at `Monoid::empty`, every sequencing step `combine`s logs, and its
+key law `tell(w1) >> tell(w2) ≡ tell(w1 <> w2)` is law-tested. `MonadTrans::lift`
+embeds an inner `M::Of<A>` into any of the three transformers, adding no effect.
 
 ## Conventions
 

@@ -19,6 +19,8 @@ pub mod identity;
 pub mod kind_based;
 /// Provides the Kind-based `Monad` and `Bind` traits and their implementations.
 pub mod monad;
+/// Defines the `Semigroup` and `Monoid` algebraic traits and their instances.
+pub mod monoid;
 /// Implements `Profunctor`, `Strong`, and `Choice` traits, primarily for function types.
 pub mod profunctor;
 /// Contains monad transformers like `ReaderT`.
@@ -39,17 +41,21 @@ pub use monad::{Bind, Monad}; // Points to monad::kind::Bind and monad::kind::Mo
 pub use profunctor::{Choice, Profunctor, Strong};
 pub use transformers::reader::MonadReader; // Points to transformers::reader::kind::MonadReader
 pub use transformers::state::MonadState; // Points to transformers::state::kind::MonadState
+pub use transformers::trans::MonadTrans; // Points to transformers::trans::MonadTrans
+pub use transformers::writer::MonadWriter; // Points to transformers::writer::kind::MonadWriter
 
 // Public re-exports of key structs/types (optional, but can be convenient)
 pub use function::{CFnOnce, RcFn};
 pub use identity::Identity; // Points to identity::kind::Identity
 pub use transformers::reader::{Reader, ReaderT}; // Points to transformers::reader::kind::ReaderT etc.
 pub use transformers::state::{State, StateT}; // Points to transformers::state::kind::StateT etc.
+pub use transformers::writer::{Writer, WriterT}; // Points to transformers::writer::kind::WriterT etc.
 
 // Re-export Kind markers and core Kind traits by default
 pub use crate::identity::IdentityKind; // Changed from IdentityHKTMarker
 pub use crate::transformers::reader::ReaderTKind;
 pub use crate::transformers::state::StateTKind;
+pub use crate::transformers::writer::WriterTKind;
 pub use kind_based::kind::{
     CFnOnceKind,
     Kind,
