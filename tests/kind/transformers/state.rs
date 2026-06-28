@@ -218,3 +218,68 @@ fn option_inner_monadstate_laws_hold() {
     assert_eq!(run_opt(lhs.clone(), 0), run_opt(put(8), 0));
     assert_eq!(run_opt(lhs, 0), Some(((), 8)));
 }
+
+// ── Parity tests: inherent ergonomic form == MonadState trait form ─────────────
+//
+// Each test runs both the inherent `StateTKind::method(..)` form and the
+// explicit `<StateTKind as MonadState<..>>::method(..)` UFCS form against
+// the same initial state and asserts they produce identical `(value, state)` pairs.
+
+#[test]
+fn ergonomic_state_parity_identity() {
+    let s0 = 5_i32;
+    let erg: TestState<i32> = TestStateKind::state(|s| (s * 2, s + 1));
+    let via_trait: TestState<i32> =
+        <TestStateKind as MonadState<i32, i32, IdentityKind>>::state(|s| (s * 2, s + 1));
+    assert_eq!(run_id(erg, s0), run_id(via_trait, s0));
+}
+
+#[test]
+fn ergonomic_get_parity_identity() {
+    let s0 = 42_i32;
+    let erg: TestState<i32> = TestStateKind::get();
+    let via_trait: TestState<i32> = <TestStateKind as MonadState<i32, i32, IdentityKind>>::get();
+    assert_eq!(run_id(erg, s0), run_id(via_trait, s0));
+}
+
+#[test]
+fn ergonomic_put_parity_identity() {
+    let s0 = 7_i32;
+    let erg: TestState<()> = TestStateKind::put(99);
+    let via_trait: TestState<()> = <TestStateKind as MonadState<i32, (), IdentityKind>>::put(99);
+    assert_eq!(run_id(erg, s0), run_id(via_trait, s0));
+}
+
+#[test]
+fn ergonomic_modify_parity_identity() {
+    let s0 = 3_i32;
+    let erg: TestState<()> = TestStateKind::modify(|s| s * 10);
+    let via_trait: TestState<()> =
+        <TestStateKind as MonadState<i32, (), IdentityKind>>::modify(|s| s * 10);
+    assert_eq!(run_id(erg, s0), run_id(via_trait, s0));
+}
+
+#[test]
+fn ergonomic_gets_parity_identity() {
+    let s0 = 4_i32;
+    let erg: TestState<i32> = TestStateKind::gets(|s| s + 100);
+    let via_trait: TestState<i32> =
+        <TestStateKind as MonadState<i32, i32, IdentityKind>>::gets(|s| s + 100);
+    assert_eq!(run_id(erg, s0), run_id(via_trait, s0));
+}
+
+#[test]
+fn ergonomic_get_parity_option() {
+    let s0 = 10_i32;
+    let erg: OptState<i32> = OptStateKind::get();
+    let via_trait: OptState<i32> = <OptStateKind as MonadState<i32, i32, OptionKind>>::get();
+    assert_eq!(run_opt(erg, s0), run_opt(via_trait, s0));
+}
+
+#[test]
+fn ergonomic_put_parity_option() {
+    let s0 = 5_i32;
+    let erg: OptState<()> = OptStateKind::put(77);
+    let via_trait: OptState<()> = <OptStateKind as MonadState<i32, (), OptionKind>>::put(77);
+    assert_eq!(run_opt(erg, s0), run_opt(via_trait, s0));
+}

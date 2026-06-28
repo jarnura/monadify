@@ -55,7 +55,7 @@ pub mod kind {
     //!
     //! // `state`: a pure state transition. Return the old value, increment the state.
     //! let tick: Counter<i32> =
-    //!     <CounterKind as MonadState<i32, i32, IdentityKind>>::state(|s| (s, s + 1));
+    //!     CounterKind::state(|s| (s, s + 1));
     //! let Identity((v, s)) = (tick.run_state_t)(10);
     //! assert_eq!((v, s), (10, 11));
     //!
@@ -451,6 +451,106 @@ pub mod kind {
             F: Fn(S) -> B + 'static,
         {
             StateT::new(move |s: S| MKindImpl::pure((f(s.clone()), s)))
+        }
+    }
+
+    // --- Ergonomic inherent associated functions on the Kind marker ---
+    //
+    // These replicate the five [`MonadState`] surface methods directly on the
+    // `StateTKind<S, MKindImpl>` marker, so callers can write
+    // `StateTKind::<i32, IdentityKind>::get()` instead of the verbose
+    // `<StateTKind<i32, IdentityKind> as MonadState<i32, i32, IdentityKind>>::get()`.
+    // Each method simply delegates to the corresponding `MonadState` impl with
+    // identical bounds. The `MonadState` trait itself is unchanged and remains
+    // the right choice for code that is generic over the transformer.
+
+    impl<S, MKindImpl: Kind1> StateTKind<S, MKindImpl> {
+        /// Embeds a pure state transition `f: S -> (A, S)` — the ergonomic
+        /// concrete form of [`MonadState::state`].
+        ///
+        /// Callers can write `StateTKind::<S, M>::state(f)` instead of
+        /// `<StateTKind<S, M> as MonadState<S, A, M>>::state(f)`.
+        /// The generic [`MonadState`] trait stays for code that is generic
+        /// over the transformer.
+        pub fn state<F, A>(f: F) -> StateT<S, MKindImpl, A>
+        where
+            S: Clone + 'static,
+            A: 'static,
+            MKindImpl: applicative_kind::Applicative<(A, S)> + 'static,
+            MKindImpl::Of<(A, S)>: 'static,
+            F: Fn(S) -> (A, S) + 'static,
+        {
+            <Self as MonadState<S, A, MKindImpl>>::state(f)
+        }
+
+        /// Reads the whole state as the value, leaving it unchanged
+        /// (`s -> (s, s)`) — the ergonomic concrete form of [`MonadState::get`].
+        ///
+        /// Callers can write `StateTKind::<S, M>::get()` instead of
+        /// `<StateTKind<S, M> as MonadState<S, S, M>>::get()`.
+        /// The generic [`MonadState`] trait stays for code that is generic
+        /// over the transformer.
+        pub fn get() -> StateT<S, MKindImpl, S>
+        where
+            S: Clone + 'static,
+            MKindImpl: applicative_kind::Applicative<(S, S)> + 'static,
+            MKindImpl::Of<(S, S)>: 'static,
+        {
+            <Self as MonadState<S, S, MKindImpl>>::get()
+        }
+
+        /// Replaces the state with `new_state`, returning unit
+        /// (`_ -> ((), new_state)`) — the ergonomic concrete form of
+        /// [`MonadState::put`].
+        ///
+        /// Callers can write `StateTKind::<S, M>::put(s)` instead of
+        /// `<StateTKind<S, M> as MonadState<S, (), M>>::put(s)`.
+        /// The generic [`MonadState`] trait stays for code that is generic
+        /// over the transformer.
+        pub fn put(new_state: S) -> StateT<S, MKindImpl, ()>
+        where
+            S: Clone + 'static,
+            MKindImpl: applicative_kind::Applicative<((), S)> + 'static,
+            MKindImpl::Of<((), S)>: 'static,
+        {
+            <Self as MonadState<S, (), MKindImpl>>::put(new_state)
+        }
+
+        /// Applies `f` to the current state and stores the result, returning
+        /// unit (`s -> ((), f(s))`) — the ergonomic concrete form of
+        /// [`MonadState::modify`].
+        ///
+        /// Callers can write `StateTKind::<S, M>::modify(f)` instead of
+        /// `<StateTKind<S, M> as MonadState<S, (), M>>::modify(f)`.
+        /// The generic [`MonadState`] trait stays for code that is generic
+        /// over the transformer.
+        pub fn modify<F>(f: F) -> StateT<S, MKindImpl, ()>
+        where
+            S: Clone + 'static,
+            MKindImpl: applicative_kind::Applicative<((), S)> + 'static,
+            MKindImpl::Of<((), S)>: 'static,
+            F: Fn(S) -> S + 'static,
+        {
+            <Self as MonadState<S, (), MKindImpl>>::modify(f)
+        }
+
+        /// Projects the state through `f` as the value, leaving the state
+        /// unchanged (`s -> (f(s), s)`) — the ergonomic concrete form of
+        /// [`MonadState::gets`].
+        ///
+        /// Callers can write `StateTKind::<S, M>::gets(f)` instead of
+        /// `<StateTKind<S, M> as MonadState<S, B, M>>::gets(f)`.
+        /// The generic [`MonadState`] trait stays for code that is generic
+        /// over the transformer.
+        pub fn gets<F, B>(f: F) -> StateT<S, MKindImpl, B>
+        where
+            S: Clone + 'static,
+            B: 'static,
+            MKindImpl: applicative_kind::Applicative<(B, S)> + 'static,
+            MKindImpl::Of<(B, S)>: 'static,
+            F: Fn(S) -> B + 'static,
+        {
+            <Self as MonadState<S, B, MKindImpl>>::gets(f)
         }
     }
 }

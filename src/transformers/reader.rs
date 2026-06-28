@@ -44,8 +44,8 @@ pub mod kind {
     //! type ConfigReaderOption<A> = ReaderT<Config, OptionKind, A>;
     //! type ConfigReaderOptionKind = ReaderTKind<Config, OptionKind>;
     //!
-    //! // 1. Using 'ask' to get the environment
-    //! let ask_for_greeting_op: ConfigReaderOption<Config> = <ConfigReaderOptionKind as MonadReader<Config, Config, OptionKind>>::ask();
+    //! // 1. Using 'ask' to get the environment (ergonomic inherent form)
+    //! let ask_for_greeting_op: ConfigReaderOption<Config> = ConfigReaderOptionKind::ask();
     //! let ask_for_greeting: ConfigReaderOption<String> = <ConfigReaderOptionKind as Functor<Config, String>>::map(
     //!     ask_for_greeting_op,
     //!     |config: Config| config.greeting
@@ -148,6 +148,32 @@ pub mod kind {
                 _phantom_m_kind: PhantomData, // Changed _phantom_m_marker to _phantom_m_kind
                 _phantom_a: PhantomData,
             }
+        }
+
+        /// Runs `self` in a modified environment — the chainable method form of
+        /// [`MonadReader::local`].
+        ///
+        /// Applies `f` to the environment before the computation sees it, without
+        /// changing the environment visible to the surrounding context.
+        ///
+        /// # Example
+        /// ```
+        /// use monadify::transformers::reader::kind::{ReaderT, ReaderTKind};
+        /// use monadify::identity::kind::{Identity, IdentityKind};
+        ///
+        /// let comp: ReaderT<i32, IdentityKind, i32> = ReaderT::new(|env: i32| Identity(env * 2));
+        /// let result = (comp.local(|env: i32| env + 10).run_reader_t)(5);
+        /// assert_eq!(result, Identity(30)); // (5+10)*2 = 30
+        /// ```
+        pub fn local<F>(self, f: F) -> Self
+        where
+            R: 'static,
+            A: 'static,
+            MKind: 'static,
+            MKind::Of<A>: 'static,
+            F: Fn(R) -> R + 'static,
+        {
+            <ReaderTKind<R, MKind> as MonadReader<R, A, MKind>>::local(f, self)
         }
     }
 
@@ -419,6 +445,33 @@ pub mod kind {
                 let modified_env = map_env_fn(current_env);
                 computation_run(modified_env)
             })
+        }
+    }
+
+    impl<R, MKindImpl: Kind1> ReaderTKind<R, MKindImpl> {
+        /// Retrieves the environment as the value — the ergonomic concrete form of
+        /// [`MonadReader::ask`]. The generic `MonadReader` trait remains for code
+        /// generic over the inner monad.
+        ///
+        /// # Example
+        /// ```
+        /// use monadify::transformers::reader::kind::{ReaderT, ReaderTKind};
+        /// use monadify::kind_based::kind::OptionKind;
+        ///
+        /// #[derive(Clone, PartialEq, Debug)]
+        /// struct Cfg { id: i32 }
+        /// type CfgReaderKind = ReaderTKind<Cfg, OptionKind>;
+        ///
+        /// let get_env: ReaderT<Cfg, OptionKind, Cfg> = CfgReaderKind::ask();
+        /// assert_eq!((get_env.run_reader_t)(Cfg { id: 7 }), Some(Cfg { id: 7 }));
+        /// ```
+        pub fn ask() -> ReaderT<R, MKindImpl, R>
+        where
+            R: Clone + 'static,
+            MKindImpl: applicative_kind::Applicative<R> + 'static,
+            MKindImpl::Of<R>: 'static,
+        {
+            <Self as MonadReader<R, R, MKindImpl>>::ask()
         }
     }
 }
