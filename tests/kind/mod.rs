@@ -9,6 +9,7 @@ pub mod identity;
 #[allow(clippy::module_inception)]
 pub mod kind;
 pub mod monad;
+pub mod monoid;
 pub mod proptest_laws;
 pub mod transformers;
 
