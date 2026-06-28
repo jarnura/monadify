@@ -15,7 +15,7 @@ use monadify::applicative::kind::Applicative;
 use monadify::identity::{Identity, IdentityKind};
 use monadify::monad::kind::Bind;
 use monadify::monoid::{Monoid, Semigroup};
-use monadify::transformers::writer::{MonadWriter, Writer, WriterTKind};
+use monadify::transformers::writer::{Writer, WriterTKind};
 use proptest::prelude::*;
 
 type W<A> = Writer<Vec<i32>, A>;
@@ -31,7 +31,7 @@ fn arrow(slope: i32, intercept: i32, log: Vec<i32>) -> impl Fn(i32) -> W<i32> + 
     move |x: i32| {
         let mut lf = linear_fn(slope, intercept);
         let v = lf(x);
-        <WKind as MonadWriter<Vec<i32>, i32, IdentityKind>>::writer(v, log.clone())
+        WKind::writer(v, log.clone())
     }
 }
 
@@ -57,7 +57,7 @@ proptest! {
     /// Right identity: `bind(m, pure) == m`.
     #[test]
     fn writer_monad_right_identity(v in any::<i32>(), log in arb_log()) {
-        let m = || <WKind as MonadWriter<Vec<i32>, i32, IdentityKind>>::writer(v, log.clone());
+        let m = || WKind::writer(v, log.clone());
         let lhs = WKind::bind(m(), WKind::pure);
         prop_assert_eq!(run(lhs), run(m()));
     }
@@ -69,7 +69,7 @@ proptest! {
                                   (sl2, ic2) in (any::<i32>(), any::<i32>()), log2 in arb_log()) {
         let f = arrow(sl1, ic1, log1);
         let g = arrow(sl2, ic2, log2);
-        let m = || <WKind as MonadWriter<Vec<i32>, i32, IdentityKind>>::writer(v, m_log.clone());
+        let m = || WKind::writer(v, m_log.clone());
 
         let lhs = WKind::bind(WKind::bind(m(), f.clone()), g.clone());
         let rhs = WKind::bind(m(), move |x| WKind::bind(f(x), g.clone()));
@@ -81,7 +81,7 @@ proptest! {
     /// `tell(w1) >> tell(w2) == tell(w1 <> w2)`.
     #[test]
     fn writer_tell_appends_monoidally(w1 in arb_log(), w2 in arb_log()) {
-        let tell = |w: Vec<i32>| <WKind as MonadWriter<Vec<i32>, (), IdentityKind>>::tell(w);
+        let tell = |w: Vec<i32>| WKind::tell(w);
         let lhs = WKind::bind(tell(w1.clone()), {
             let w2 = w2.clone();
             move |_| tell(w2.clone())
@@ -93,7 +93,7 @@ proptest! {
     /// `tell(empty) == pure(())`.
     #[test]
     fn writer_tell_empty_is_pure_unit(_ignored in any::<bool>()) {
-        let lhs = <WKind as MonadWriter<Vec<i32>, (), IdentityKind>>::tell(Vec::empty());
+        let lhs = WKind::tell(Vec::empty());
         let rhs: W<()> = WKind::pure(());
         prop_assert_eq!(run(lhs), run(rhs));
     }
@@ -101,11 +101,8 @@ proptest! {
     /// `censor` then run == apply the rewrite to the final log.
     #[test]
     fn writer_censor_rewrites_log(w in arb_log()) {
-        let tell = <WKind as MonadWriter<Vec<i32>, (), IdentityKind>>::tell(w.clone());
-        let censored = <WKind as MonadWriter<Vec<i32>, (), IdentityKind>>::censor(
-            |mut log: Vec<i32>| { log.reverse(); log },
-            tell,
-        );
+        let tell = WKind::tell(w.clone());
+        let censored = tell.censor(|mut log: Vec<i32>| { log.reverse(); log });
         let mut expected = w;
         expected.reverse();
         prop_assert_eq!(run(censored).1, expected);

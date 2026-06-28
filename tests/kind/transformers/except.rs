@@ -32,11 +32,11 @@ fn run_id<A>(m: E<A>) -> Result<A, String> {
 }
 
 fn throw(msg: &str) -> E<i32> {
-    <EKind as MonadError<String, i32, IdentityKind>>::throw_error(msg.to_string())
+    ExceptT::throw(msg.to_string())
 }
 
 fn ok(n: i32) -> E<i32> {
-    <EKind as MonadError<String, i32, IdentityKind>>::lift_either(Ok(n))
+    ExceptT::ok(n)
 }
 
 // ── Functor / Applicative / Apply / Bind / Monad smoke tests ────────────────
@@ -167,7 +167,7 @@ fn throw_left_zero() {
 fn catch_throw_runs_handler() {
     // catch(throw(e), h) == h(e)
     let h = |e: String| ok(e.len() as i32);
-    let lhs = <EKind as MonadError<String, i32, IdentityKind>>::catch_error(throw("err"), h);
+    let lhs = throw("err").catch(h);
     let rhs = h("err".to_string());
     assert_eq!(run_id(lhs.clone()), run_id(rhs));
     assert_eq!(run_id(lhs), Ok(3)); // "err".len() == 3
@@ -177,15 +177,14 @@ fn catch_throw_runs_handler() {
 fn catch_pure_ignores_handler() {
     // catch(pure(a), h) == pure(a)  — the handler never runs on success.
     let h = |_e: String| ok(-1);
-    let lhs = <EKind as MonadError<String, i32, IdentityKind>>::catch_error(ok(7), h);
+    let lhs = ok(7).catch(h);
     assert_eq!(run_id(lhs), Ok(7));
 }
 
 #[test]
 fn lift_either_embeds_result() {
     assert_eq!(run_id(ok(5)), Ok(5));
-    let err: E<i32> =
-        <EKind as MonadError<String, i32, IdentityKind>>::lift_either(Err("x".into()));
+    let err: E<i32> = ExceptT::from_result(Err("x".into()));
     assert_eq!(run_id(err), Err("x".to_string()));
 }
 
@@ -308,19 +307,14 @@ type OptEKind = ExceptTKind<String, OptionKind>;
 #[test]
 fn option_inner_threads_ok() {
     let m: OptE<i32> = OptEKind::pure(3);
-    let bound = OptEKind::bind(m, |x| {
-        <OptEKind as MonadError<String, i32, OptionKind>>::lift_either(Ok(x + 1))
-    });
+    let bound = OptEKind::bind(m, |x| ExceptT::ok(x + 1));
     assert_eq!(bound.run_except_t, Some(Ok(4)));
 }
 
 #[test]
 fn option_inner_carries_err() {
-    let thrown: OptE<i32> =
-        <OptEKind as MonadError<String, i32, OptionKind>>::throw_error("e".to_string());
-    let bound = OptEKind::bind(thrown, |x| {
-        <OptEKind as MonadError<String, i32, OptionKind>>::lift_either(Ok(x))
-    });
+    let thrown: OptE<i32> = ExceptT::throw("e".to_string());
+    let bound = OptEKind::bind(thrown, |x| ExceptT::ok(x));
     // The ExceptT-level error is carried in the inner Some.
     assert_eq!(bound.run_except_t, Some(Err("e".to_string())));
 }
@@ -329,18 +323,13 @@ fn option_inner_carries_err() {
 fn option_inner_none_short_circuits() {
     // A failure in the inner Option discards everything (distinct from an Err).
     let failing: OptE<i32> = ExceptT::new(None);
-    let bound = OptEKind::bind(failing, |x| {
-        <OptEKind as MonadError<String, i32, OptionKind>>::lift_either(Ok(x))
-    });
+    let bound = OptEKind::bind(failing, |x| ExceptT::ok(x));
     assert_eq!(bound.run_except_t, None);
 }
 
 #[test]
 fn option_inner_catch_recovers() {
-    let thrown: OptE<i32> =
-        <OptEKind as MonadError<String, i32, OptionKind>>::throw_error("e".to_string());
-    let recovered = <OptEKind as MonadError<String, i32, OptionKind>>::catch_error(thrown, |_e| {
-        <OptEKind as MonadError<String, i32, OptionKind>>::lift_either(Ok(0))
-    });
+    let thrown: OptE<i32> = ExceptT::throw("e".to_string());
+    let recovered = thrown.catch(|_e| ExceptT::ok(0));
     assert_eq!(recovered.run_except_t, Some(Ok(0)));
 }

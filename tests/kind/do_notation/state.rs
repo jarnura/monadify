@@ -27,17 +27,17 @@ use monadify::applicative::kind::Applicative;
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
 use monadify::monad::kind::Bind;
-use monadify::transformers::state::{MonadState, State, StateTKind};
+use monadify::transformers::state::{State, StateTKind};
 use proptest::prelude::*;
 
 type StKind = StateTKind<i32, IdentityKind>;
 type Counter<A> = State<i32, A>;
 
 fn get() -> Counter<i32> {
-    <StKind as MonadState<i32, i32, IdentityKind>>::get()
+    StKind::get()
 }
 fn put(s: i32) -> Counter<()> {
-    <StKind as MonadState<i32, (), IdentityKind>>::put(s)
+    StKind::put(s)
 }
 fn run_id<A>(st: Counter<A>, s0: i32) -> (A, i32) {
     let Identity(pair) = (st.run_state_t)(s0);
@@ -63,7 +63,7 @@ fn state_mdo_threads_and_updates() {
 fn state_mdo_uses_modify() {
     let comp: Counter<i32> = mdo! {
         StKind;
-        _ <- <StKind as MonadState<i32, (), IdentityKind>>::modify(|s| s * 2);
+        _ <- StKind::modify(|s| s * 2);
         x <- get();
         StKind::pure(x + 1)
     };
@@ -121,13 +121,13 @@ proptest! {
         let via_mdo: Counter<i32> = mdo! {
             StKind;
             x <- get();
-            _ <- <StKind as MonadState<i32, (), IdentityKind>>::modify(move |s| s.wrapping_add(d));
+            _ <- StKind::modify(move |s| s.wrapping_add(d));
             y <- get();
             StKind::pure(x.wrapping_add(y))
         };
         let via_bind: Counter<i32> = StKind::bind(get(), move |x| {
             StKind::bind(
-                <StKind as MonadState<i32, (), IdentityKind>>::modify(move |s| s.wrapping_add(d)),
+                StKind::modify(move |s| s.wrapping_add(d)),
                 move |_| StKind::bind(get(), move |y| StKind::pure(x.wrapping_add(y))),
             )
         });

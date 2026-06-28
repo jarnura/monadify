@@ -16,7 +16,7 @@ use monadify::applicative::kind::Applicative;
 use monadify::functor::kind::Functor;
 use monadify::identity::{Identity, IdentityKind};
 use monadify::monad::kind::Bind;
-use monadify::transformers::state::{MonadState, State, StateTKind};
+use monadify::transformers::state::{State, StateTKind};
 use proptest::prelude::*;
 
 type S<A> = State<i32, A>;
@@ -31,17 +31,17 @@ fn run_unit(st: S<()>, s0: i32) -> ((), i32) {
     pair
 }
 fn get() -> S<i32> {
-    <SKind as MonadState<i32, i32, IdentityKind>>::get()
+    SKind::get()
 }
 fn put(s: i32) -> S<()> {
-    <SKind as MonadState<i32, (), IdentityKind>>::put(s)
+    SKind::put(s)
 }
 /// A threaded Kleisli arrow: maps the value by a linear fn and bumps the state.
 fn arrow(slope: i32, intercept: i32, ds: i32) -> impl Fn(i32) -> S<i32> + Clone {
     move |x: i32| {
         let mut lf = linear_fn(slope, intercept);
         let v = lf(x);
-        <SKind as MonadState<i32, i32, IdentityKind>>::state(move |s: i32| (v, s.wrapping_add(ds)))
+        SKind::state(move |s: i32| (v, s.wrapping_add(ds)))
     }
 }
 
@@ -64,10 +64,10 @@ proptest! {
     #[test]
     fn state_monad_right_identity(s0 in any::<i32>(), ds in any::<i32>()) {
         let lhs = SKind::bind(
-            <SKind as MonadState<i32, i32, IdentityKind>>::state(move |s: i32| (s, s.wrapping_add(ds))),
+            SKind::state(move |s: i32| (s, s.wrapping_add(ds))),
             SKind::pure,
         );
-        let rhs = <SKind as MonadState<i32, i32, IdentityKind>>::state(move |s: i32| (s, s.wrapping_add(ds)));
+        let rhs = SKind::state(move |s: i32| (s, s.wrapping_add(ds)));
         prop_assert_eq!(run(lhs, s0), run(rhs, s0));
     }
 
@@ -78,7 +78,7 @@ proptest! {
                                  (sl2, ic2, ds2) in (any::<i32>(), any::<i32>(), any::<i32>())) {
         let f = arrow(sl1, ic1, ds1);
         let g = arrow(sl2, ic2, ds2);
-        let m = || <SKind as MonadState<i32, i32, IdentityKind>>::state(move |s: i32| (s, s.wrapping_add(1)));
+        let m = || SKind::state(move |s: i32| (s, s.wrapping_add(1)));
 
         let lhs = SKind::bind(SKind::bind(m(), f.clone()), g.clone());
         let rhs = SKind::bind(m(), move |x| SKind::bind(f(x), g.clone()));
@@ -120,7 +120,7 @@ proptest! {
     /// `gets(f) == get.map(f)` and `modify(f) == get >>= (put . f)`.
     #[test]
     fn state_gets_and_modify_derivations(s0 in any::<i32>(), (sl, ic) in (any::<i32>(), any::<i32>())) {
-        let gets = <SKind as MonadState<i32, i32, IdentityKind>>::gets(move |s| {
+        let gets = SKind::gets(move |s| {
             let mut lf = linear_fn(sl, ic);
             lf(s)
         });
@@ -130,7 +130,7 @@ proptest! {
         });
         prop_assert_eq!(run(gets, s0), run(derived_gets, s0));
 
-        let modify = <SKind as MonadState<i32, (), IdentityKind>>::modify(move |s| {
+        let modify = SKind::modify(move |s| {
             let mut lf = linear_fn(sl, ic);
             lf(s)
         });
