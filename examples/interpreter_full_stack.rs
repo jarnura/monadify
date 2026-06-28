@@ -3,7 +3,7 @@
 //!
 //! - **Reader** (`Env`)   — the variable environment (`name -> value`).
 //! - **State** (`i64`)    — an evaluation-step counter, bumped at each node.
-//! - **Writer** (`Vec<String>`) — a pre-order trace of evaluated subexpressions.
+//! - **Writer** (`Vec<String>`) — a post-order trace of evaluated subexpressions.
 //! - **Except** (`EvalError`)   — `UnboundVariable` / `DivByZero` errors.
 //!
 //! The stack, innermost to outermost:
@@ -15,11 +15,10 @@
 //! accumulated state and trace — you get `Err(e)`, never a partial
 //! `((value, state), log)`. That ordering is the key teaching point.
 //!
-//! Run: `cargo run --quiet --example interpreter_full_stack`
+//! Run: `cargo run --quiet --example interpreter_full_stack --features do-notation`
 
-use monadify::applicative::kind::Applicative;
 use monadify::identity::{Identity, IdentityKind};
-use monadify::monad::kind::Bind;
+use monadify::mdo;
 use monadify::transformers::except::{ExceptT, ExceptTKind};
 use monadify::transformers::reader::{ReaderT, ReaderTKind};
 use monadify::transformers::state::StateTKind;
@@ -37,7 +36,8 @@ enum EvalError {
 }
 
 /// The variable environment (the `Reader` layer). NOT `Copy` — it holds `String`
-/// keys, so `eval` uses explicit `AppKind::bind` rather than `mdo!`.
+/// keys; the `Var` arm works around the one-non-Copy-per-level rule with
+/// `let`-bound clones inside the `mdo!` block.
 #[derive(Clone, PartialEq, Debug)]
 struct Env {
     bindings: Vec<(String, i64)>,
@@ -111,68 +111,93 @@ fn throw_err(e: EvalError) -> App<i64> {
     AppKind::lift(StateLayerKind::lift(WriterLayerKind::lift(thrown)))
 }
 
-/// Bump the step counter and record one trace entry for the node being entered.
-/// Combines the `State` and `Writer` effects; called pre-order at every node.
+/// Bump the step counter and record one trace entry for the given node label.
+/// Uses `mdo!` to sequence the `State` and `Writer` effects.
+///
+/// `n` is `i64` (`Copy`) so it crosses the second bind level freely.
+/// `msg` is created by a `let` binding inside the block so the inner
+/// `move` closure owns a fresh `String` and `.clone()` keeps it `FnMut`.
 fn visit(label: String) -> App<()> {
-    AppKind::bind(get_step(), move |n| {
-        let label = label.clone();
-        AppKind::bind(put_step(n + 1), move |_| {
-            tell_log(format!("step {}: {}", n + 1, label))
-        })
-    })
+    mdo! { AppKind;
+        n <- get_step();
+        let msg = format!("step {}: {}", n + 1, label);
+        _ <- put_step(n + 1);
+        tell_log(msg.clone())
+    }
 }
 
 // ── The interpreter ─────────────────────────────────────────────────────────────
 
-/// Evaluate `expr` in the full stack. Each node: bumps the counter (State),
-/// records a trace entry (Writer), looks vars up in the env (Reader), and throws
-/// on unbound var / div-by-zero (Except). Uses explicit `AppKind::bind` because
-/// `Env` is not `Copy`.
+/// Thin owned-argument wrapper so `eval` can be called from inside `mdo!`
+/// `move` closures that hold an `Expr` by value.
+fn eval_owned(e: Expr) -> App<i64> {
+    eval(&e)
+}
+
+/// Evaluate `expr` in the full stack using `mdo!` do-notation.  Traversal is
+/// **post-order**: each node's trace entry is emitted *after* all its children
+/// have been evaluated, so inner nodes appear later in the trace than leaves.
+///
+/// Every node bumps the step counter (State), records a trace entry (Writer),
+/// looks variables up in the environment (Reader), and short-circuits on an
+/// unbound variable or a zero divisor (Except).
 fn eval(expr: &Expr) -> App<i64> {
     match expr {
+        // Lit: leaf node — just visit, then return the literal.
+        // `n` is `i64` (Copy), so it crosses the bind level freely.
         Expr::Lit(n) => {
             let n = *n;
-            AppKind::bind(visit(format!("Lit({n})")), move |_| AppKind::pure(n))
+            mdo! { AppKind;
+                _ <- visit(format!("Lit({n})"));
+                pure(n)
+            }
         }
+
+        // Var: visit first, then look up in the environment.
+        // `name` and `env` are both non-Copy; `let` bindings inside the
+        // `mdo!` block clone them at the right nesting level so the outer
+        // `FnMut` closure never has to move them out (which would be E0507).
         Expr::Var(name) => {
             let name = name.clone();
-            AppKind::bind(visit(format!("Var({name})")), move |_| {
-                let name = name.clone();
-                AppKind::bind(ask_env(), move |env: Env| match env.lookup(&name) {
-                    Some(v) => AppKind::pure(v),
-                    None => throw_err(EvalError::UnboundVariable(name.clone())),
-                })
-            })
+            let label = format!("Var({name})");
+            mdo! { AppKind;
+                _ <- visit(label);
+                let lookup_key = name.clone();
+                let err = EvalError::UnboundVariable(name.clone());
+                env <- ask_env();
+                match env.lookup(&lookup_key) {
+                    Some(v) => pure(v),
+                    None => throw_err(err.clone()),
+                }
+            }
         }
+
+        // Add: post-order — evaluate children first, then visit the node.
+        // `lv` and `rv` are `i64` (Copy) and cross bind levels freely.
+        // `r.clone()` is load-bearing: moving the FnMut-captured `r` out
+        // would be E0507.
         Expr::Add(l, r) => {
             let l = (**l).clone();
             let r = (**r).clone();
-            AppKind::bind(visit("Add".to_string()), move |_| {
-                let l = l.clone();
-                let r = r.clone();
-                AppKind::bind(eval(&l), move |lv| {
-                    let r = r.clone();
-                    AppKind::bind(eval(&r), move |rv| AppKind::pure(lv + rv))
-                })
-            })
+            mdo! { AppKind;
+                lv <- eval_owned(l);
+                rv <- eval_owned(r.clone());
+                _ <- visit("Add".into());
+                pure(lv + rv)
+            }
         }
+
+        // Div: post-order — evaluate children first, visit, then check divisor.
+        // Same `r.clone()` rationale as `Add`.
         Expr::Div(l, r) => {
             let l = (**l).clone();
             let r = (**r).clone();
-            AppKind::bind(visit("Div".to_string()), move |_| {
-                let l = l.clone();
-                let r = r.clone();
-                AppKind::bind(eval(&l), move |lv| {
-                    let r = r.clone();
-                    AppKind::bind(eval(&r), move |rv| {
-                        if rv == 0 {
-                            throw_err(EvalError::DivByZero)
-                        } else {
-                            AppKind::pure(lv / rv)
-                        }
-                    })
-                })
-            })
+            mdo! { AppKind;
+                lv <- eval_owned(l);
+                rv <- eval_owned(r.clone());
+                _ <- visit("Div".into());
+                if rv == 0 { throw_err(EvalError::DivByZero) } else { pure(lv / rv) }
+            }
         }
     }
 }
@@ -192,6 +217,7 @@ fn main() {
 
     // ── Success run ───────────────────────────────────────────────────────────
     // env = { x = 10, y = 4 };  expr = x + (20 / y) = 10 + 5 = 15
+    // Post-order trace: leaves left-to-right, then inner nodes bottom-up.
     let env = Env::new(&[("x", 10), ("y", 4)]);
     let expr = Expr::Add(
         Box::new(Expr::Var("x".to_string())),
@@ -202,16 +228,16 @@ fn main() {
     );
     let result = run(eval(&expr), env.clone(), 0);
     let expected_trace = vec![
-        "step 1: Add".to_string(),
-        "step 2: Var(x)".to_string(),
-        "step 3: Div".to_string(),
-        "step 4: Lit(20)".to_string(),
-        "step 5: Var(y)".to_string(),
+        "step 1: Var(x)".to_string(),
+        "step 2: Lit(20)".to_string(),
+        "step 3: Var(y)".to_string(),
+        "step 4: Div".to_string(),
+        "step 5: Add".to_string(),
     ];
     assert_eq!(
         result,
         Ok(((15, 5), expected_trace.clone())),
-        "success: value 15, 5 steps, full pre-order trace"
+        "success: value 15, 5 steps, full post-order trace"
     );
     println!("Success: x + (20 / y) with x=10, y=4");
     println!("  result = {result:?}");

@@ -3,12 +3,12 @@
 //! Two raw string fields — port and retries — are parsed independently. Each parse
 //! produces an `ExceptT<ParseIntError, IdentityKind, _>`. The error channel is then
 //! remapped via `with_except_t` into a domain-specific `ConfigError`. The two
-//! `Checked<_>` computations are sequenced with `bind` so the first bad field
+//! `Checked<_>` computations are sequenced with `mdo!` so the first bad field
 //! short-circuits and the second is never attempted.
 //!
 //! Run with: `cargo run --example except_config_loader --features do-notation`
 
-use monadify::monad::kind::Bind;
+use monadify::mdo;
 use monadify::transformers::except::{Except, ExceptT, ExceptTKind};
 use monadify::{Identity, IdentityKind};
 use std::num::ParseIntError;
@@ -21,7 +21,7 @@ enum ConfigError {
 }
 
 /// Fully parsed configuration.
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 struct Config {
     port: u16,
     retries: u32,
@@ -30,7 +30,7 @@ struct Config {
 /// `Except<ConfigError, A>` = `ExceptT<ConfigError, IdentityKind, A>`.
 type Checked<A> = Except<ConfigError, A>;
 
-/// Kind marker alias used for sequencing `Checked<_>` computations with `bind`.
+/// Kind marker alias used as the `mdo!` block marker for `Checked<_>` computations.
 type CKind = ExceptTKind<ConfigError, IdentityKind>;
 
 /// Parse `port_s` as `u16` and `retries_s` as `u32`, unifying any
@@ -51,13 +51,14 @@ fn load(port_s: &str, retries_s: &str) -> Checked<Config> {
     let retries_c: Checked<u32> =
         retries_raw.with_except_t(|e| ConfigError::BadRetries(e.to_string()));
 
-    // Sequence: port_c >>= \port -> retries_c >>= \retries -> Ok(Config { .. })
-    // Short-circuit: Err in port_c skips the inner bind entirely.
-    CKind::bind(port_c, move |port| {
-        CKind::bind(retries_c.clone(), move |retries| {
-            Checked::ok(Config { port, retries })
-        })
-    })
+    // Sequence with mdo!: port_c >>= \port -> retries_c >>= \retries -> pure(Config { .. })
+    // Short-circuit: Err in port_c skips the rest of the block entirely.
+    mdo! {
+        CKind;
+        port <- port_c;
+        retries <- retries_c;
+        pure(Config { port, retries })
+    }
 }
 
 fn main() {
@@ -108,6 +109,6 @@ fn main() {
         "  * ExceptT::from_result  wraps a Result into ExceptT<ParseIntError, IdentityKind, _>."
     );
     println!("  * with_except_t    remaps the error channel: ParseIntError -> ConfigError.");
-    println!("  * bind             sequences Checked<_> steps, short-circuiting on Err.");
+    println!("  * mdo!             sequences Checked<_> steps, short-circuiting on Err.");
     println!("  * run_except_t     is a field exposing Identity<Result<Config, ConfigError>>.");
 }

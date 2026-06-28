@@ -99,3 +99,4 @@ required-features = ["do-notation"]
 
 [[example]]
 name = "interpreter_full_stack"
+required-features = ["do-notation"]
