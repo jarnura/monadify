@@ -64,3 +64,19 @@ required-features = ["do-notation"]
 [[example]]
 name = "state_bank_account"
 required-features = ["do-notation"]
+
+[[example]]
+name = "writer_audit_log"
+required-features = ["do-notation"]
+
+[[example]]
+name = "writer_cost_monoid"
+required-features = ["do-notation"]
+
+[[example]]
+name = "writer_listen_censor"
+required-features = ["do-notation"]
+
+[[example]]
+name = "writer_eval_trace"
+required-features = ["do-notation"]

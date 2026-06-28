@@ -140,6 +140,25 @@ cargo run --example state_bank_account --features do-notation
 
 See [`monadify::mdo`](https://docs.rs/monadify) documentation for full details.
 
+### Writer monad examples
+
+These demonstrate the `WriterT` Writer monad accumulating a monoidal log through a
+computation via `mdo!` do-notation — `tell` appends to the log while the result is
+threaded as usual:
+
+- `writer_audit_log.rs` — order/payment pipeline whose `Vec<String>` audit trail is the Writer log (`tell`)
+- `writer_cost_monoid.rs` — running cost accumulated via a user-defined `Sum(u64)` monoid (your own `Semigroup`/`Monoid` impl)
+- `writer_listen_censor.rs` — scoped, redacting logger using `listen` (capture a sub-computation's log) and `censor` (rewrite the log)
+- `writer_eval_trace.rs` — arithmetic evaluator accumulating a `String` step-by-step trace
+
+Run any of them with (each requires the `do-notation` feature):
+```bash
+cargo run --example writer_audit_log     --features do-notation
+cargo run --example writer_cost_monoid   --features do-notation
+cargo run --example writer_listen_censor --features do-notation
+cargo run --example writer_eval_trace    --features do-notation
+```
+
 ## Building the Project
 
 To build the library:
