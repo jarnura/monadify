@@ -30,6 +30,9 @@ Core infrastructure lives in `src/kind_based/kind.rs`.
   `MonadWriter` (`tell`/`writer`/`listen`/`censor`) + runner `exec_writer_t`.
   `src/transformers/except.rs` — `ExceptT` + `MonadError`
   (`throw_error`/`catch_error`/`lift_either`) + error-channel map `with_except_t`.
+  `ExceptT` also provides inherent `ok`/`throw`/`from_result`/`catch` as the
+  ergonomic concrete forms of the `MonadError` surface (the trait stays for generic
+  code).
   `src/transformers/trans.rs` — `MonadTrans` (`lift`, impl'd for all four
   transformers). `src/monoid.rs` — `Semigroup`/`Monoid` (`combine`/`empty`).
   `src/utils.rs` — `fn0!`..`fn3!` macros.
@@ -58,7 +61,9 @@ Applicative (ExceptT e m)`). It imposes the **lightest payload constraint** of
 any transformer: `E: 'static` only — no `Monoid` (unlike `WriterT`'s `W`), no
 `Clone` (unlike `StateT`'s `S`). Its `MonadError` surface is `throw_error`
 (primitive), `catch_error`, and `lift_either`, with the catch laws (catch-throw,
-catch-pure) and throw-left-zero law-tested. `MonadTrans::lift` embeds an inner
+catch-pure) and throw-left-zero law-tested. `ExceptT` also provides inherent
+`ok`/`throw`/`from_result`/`catch` as the ergonomic concrete forms of the
+`MonadError` surface (the trait stays for generic code). `MonadTrans::lift` embeds an inner
 `M::Of<A>` into any of the four transformers, adding no effect (`ExceptT`'s
 `lift` wraps the value in `Ok`).
 

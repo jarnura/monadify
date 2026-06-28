@@ -3,8 +3,8 @@
 //!
 //! Demonstrates:
 //! - `mdo!` over `Except<OrderError, _>` short-circuiting on the first `Err`.
-//! - `throw_error` and `lift_either` from `MonadError`.
-//! - `catch_error` for recovery from a failed pipeline.
+//! - `ExceptT::throw` and `ExceptT::ok` from the inherent ergonomic API.
+//! - `.catch(..)` for recovery from a failed pipeline.
 //! - A thread-local counter proving `charge_card` is never invoked when an
 //!   earlier stage fails (short-circuit guarantee).
 //!
@@ -14,7 +14,7 @@ use std::cell::Cell;
 
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
-use monadify::transformers::except::{Except, ExceptTKind, MonadError};
+use monadify::transformers::except::{Except, ExceptTKind};
 
 // ── Domain types ──────────────────────────────────────────────────────────────
 
@@ -64,17 +64,17 @@ fn charge_count() -> u32 {
 
 fn validate_cart(o: Order) -> Checked<Order> {
     if o.items == 0 {
-        <CKind as MonadError<OrderError, Order, IdentityKind>>::throw_error(OrderError::EmptyCart)
+        Checked::throw(OrderError::EmptyCart)
     } else {
-        <CKind as MonadError<OrderError, Order, IdentityKind>>::lift_either(Ok(o))
+        Checked::ok(o)
     }
 }
 
 fn reserve_stock(o: Order) -> Checked<Order> {
     if !o.in_stock {
-        <CKind as MonadError<OrderError, Order, IdentityKind>>::throw_error(OrderError::OutOfStock)
+        Checked::throw(OrderError::OutOfStock)
     } else {
-        <CKind as MonadError<OrderError, Order, IdentityKind>>::lift_either(Ok(o))
+        Checked::ok(o)
     }
 }
 
@@ -82,13 +82,9 @@ fn charge_card(o: Order) -> Checked<Receipt> {
     // Incremented at the START — a count of 0 proves this function never ran.
     CHARGE_COUNT.with(|c| c.set(c.get() + 1));
     if !o.card_ok {
-        <CKind as MonadError<OrderError, Receipt, IdentityKind>>::throw_error(
-            OrderError::PaymentDeclined,
-        )
+        Checked::throw(OrderError::PaymentDeclined)
     } else {
-        <CKind as MonadError<OrderError, Receipt, IdentityKind>>::lift_either(Ok(Receipt {
-            total: o.total,
-        }))
+        Checked::ok(Receipt { total: o.total })
     }
 }
 
@@ -203,7 +199,7 @@ fn main() {
     );
     println!("Test 4 PASS — declined card => Err(PaymentDeclined)");
 
-    // ── Test 5: catch_error recovery ─────────────────────────────────────────
+    // ── Test 5: catch recovery ────────────────────────────────────────────────
     reset_counter();
     let failing = Order {
         items: 0,
@@ -211,25 +207,18 @@ fn main() {
         card_ok: true,
         total: 0,
     };
-    let recovered = <CKind as MonadError<OrderError, Receipt, IdentityKind>>::catch_error(
-        run_pipeline(failing),
-        |_e| {
-            <CKind as MonadError<OrderError, Receipt, IdentityKind>>::lift_either(Ok(Receipt {
-                total: 0,
-            }))
-        },
-    );
+    let recovered = run_pipeline(failing).catch(|_e| Checked::ok(Receipt { total: 0 }));
     assert_eq!(
         run(recovered),
         Ok(Receipt { total: 0 }),
-        "catch_error must recover from EmptyCart with a fallback Receipt"
+        "catch must recover from EmptyCart with a fallback Receipt"
     );
-    println!("Test 5 PASS — catch_error(EmptyCart) => Ok(Receipt {{ total: 0 }}) [recovery]");
+    println!("Test 5 PASS — catch(EmptyCart) => Ok(Receipt {{ total: 0 }}) [recovery]");
 
     println!("\n=== All 5 tests passed! ===");
     println!();
     println!("Key insights:");
     println!("  mdo! with ExceptT short-circuits: an Err in any stage skips all later stages.");
     println!("  charge_card count=0 proves it was never entered when an earlier stage failed.");
-    println!("  catch_error turns a failed pipeline into a fallback success computation.");
+    println!("  .catch(..) turns a failed pipeline into a fallback success computation.");
 }
