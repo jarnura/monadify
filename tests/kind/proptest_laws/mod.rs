@@ -16,6 +16,7 @@ use proptest::prelude::*;
 
 pub mod applicative;
 pub mod apply;
+pub mod except;
 pub mod functor;
 pub mod monad;
 pub mod rcfn;

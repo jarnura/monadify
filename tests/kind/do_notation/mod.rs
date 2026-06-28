@@ -17,6 +17,7 @@
 
 pub mod auto_pure;
 pub mod cfn_unsupported;
+pub mod except;
 pub mod identity;
 pub mod laws;
 pub mod option;

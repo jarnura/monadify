@@ -11,7 +11,7 @@ plus profunctor-encoded optics. v0.1.1, MIT, edition 2021, MSRV 1.66.
 The defining design simulates **Higher-Kinded Types (HKTs)** using Generic
 Associated Types: a `Kind` trait with `type Of<Arg>` plus lightweight marker
 structs (`OptionKind`, `VecKind`, `ResultKind<E>`, `CFnKind<X>`, `CFnOnceKind<X>`,
-`RcFnKind<X>`, `IdentityKind`, `ReaderTKind`, `StateTKind`, `WriterTKind`). Traits are generic over the *marker*, and
+`RcFnKind<X>`, `IdentityKind`, `ReaderTKind`, `StateTKind`, `WriterTKind`, `ExceptTKind`). Traits are generic over the *marker*, and
 `Self::Of<A>` resolves to the concrete type (e.g. `OptionKind::Of<i32> == Option<i32>`).
 Core infrastructure lives in `src/kind_based/kind.rs`.
 
@@ -28,7 +28,9 @@ Core infrastructure lives in `src/kind_based/kind.rs`.
   `MonadState` (`state`/`get`/`put`/`modify`/`gets`) + runners
   `run`/`eval`/`exec_state_t`. `src/transformers/writer.rs` — `WriterT` +
   `MonadWriter` (`tell`/`writer`/`listen`/`censor`) + runner `exec_writer_t`.
-  `src/transformers/trans.rs` — `MonadTrans` (`lift`, impl'd for all three
+  `src/transformers/except.rs` — `ExceptT` + `MonadError`
+  (`throw_error`/`catch_error`/`lift_either`) + error-channel map `with_except_t`.
+  `src/transformers/trans.rs` — `MonadTrans` (`lift`, impl'd for all four
   transformers). `src/monoid.rs` — `Semigroup`/`Monoid` (`combine`/`empty`).
   `src/utils.rs` — `fn0!`..`fn3!` macros.
 - `src/legacy/` — the older associated-type implementation, behind the `legacy`
@@ -37,15 +39,28 @@ Core infrastructure lives in `src/kind_based/kind.rs`.
   criterion benchmarks comparing kind-based vs native vs legacy.
 
 Concrete instances implementing the full hierarchy (where lawful): `Option`,
-`Result`, `Vec`, `Identity`, `RcFn`, `CFnOnce`, `ReaderT`, `StateT`, `WriterT`. `StateT`'s
+`Result`, `Vec`, `Identity`, `RcFn`, `CFnOnce`, `ReaderT`, `StateT`, `WriterT`,
+`ExceptT`. `StateT`'s
 `Apply`/`Bind`/`Monad` require the **inner** monad to be `Bind`/`Monad` (state is
 threaded — a sequential dependency), unlike `ReaderT` whose `Apply` needs only an
 inner `Apply`; its four `MonadState` laws (get-get, get-put, put-get, put-put) are
 first-class and law-tested. `WriterT` is in the **`ReaderT` family** (its `Apply`
 needs only an inner `Apply`) but adds a `W: Monoid` constraint on the log: `pure`
 seeds the log at `Monoid::empty`, every sequencing step `combine`s logs, and its
-key law `tell(w1) >> tell(w2) ≡ tell(w1 <> w2)` is law-tested. `MonadTrans::lift`
-embeds an inner `M::Of<A>` into any of the three transformers, adding no effect.
+key law `tell(w1) >> tell(w2) ≡ tell(w1 <> w2)` is law-tested. `ExceptT` is a
+**hybrid**: it has a `WriterT`-shaped *value* carrier (`run_except_t:
+M::Of<Result<A, E>>`, manual `Clone` bounded on the projected inner type) but
+sits in the **`StateT` bound-family** — its `apply`/`bind`/`join` require the
+inner monad to be `Bind`/`Monad`, because short-circuiting on `Err` is a
+sequential data dependency and an inner-`Apply`-only `apply` would break the
+Applicative–Monad consistency law (matching Haskell's `instance (Monad m) =>
+Applicative (ExceptT e m)`). It imposes the **lightest payload constraint** of
+any transformer: `E: 'static` only — no `Monoid` (unlike `WriterT`'s `W`), no
+`Clone` (unlike `StateT`'s `S`). Its `MonadError` surface is `throw_error`
+(primitive), `catch_error`, and `lift_either`, with the catch laws (catch-throw,
+catch-pure) and throw-left-zero law-tested. `MonadTrans::lift` embeds an inner
+`M::Of<A>` into any of the four transformers, adding no effect (`ExceptT`'s
+`lift` wraps the value in `Ok`).
 
 ## Conventions
 
