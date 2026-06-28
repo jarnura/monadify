@@ -9,7 +9,7 @@
 
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
-use monadify::transformers::state::{MonadState, State, StateTKind};
+use monadify::transformers::state::{State, StateTKind};
 
 /// Type alias: a computation that threads a `Vec<i64>` operand stack and produces `A`.
 /// `State<S, A> = StateT<S, IdentityKind, A>`.
@@ -22,7 +22,7 @@ type SKind = StateTKind<Vec<i64>, IdentityKind>;
 
 /// Push an operand onto the stack (returns unit; modifies state).
 fn push(n: i64) -> Stack<()> {
-    <SKind as MonadState<Vec<i64>, (), IdentityKind>>::modify(move |mut st| {
+    SKind::modify(move |mut st| {
         st.push(n);
         st
     })
@@ -30,7 +30,7 @@ fn push(n: i64) -> Stack<()> {
 
 /// Apply a binary operator: pop two operands (right then left), push one result.
 fn binary_op(op: impl Fn(i64, i64) -> i64 + 'static) -> Stack<()> {
-    <SKind as MonadState<Vec<i64>, (), IdentityKind>>::state(move |mut st| {
+    SKind::state(move |mut st| {
         let b = st.pop().expect("stack underflow: missing right operand");
         let a = st.pop().expect("stack underflow: missing left operand");
         st.push(op(a, b));
@@ -50,9 +50,7 @@ fn mul_op() -> Stack<()> {
 
 /// Read the top of the stack without consuming it (state is left unchanged).
 fn peek_top() -> Stack<i64> {
-    <SKind as MonadState<Vec<i64>, i64, IdentityKind>>::gets(|st| {
-        *st.last().expect("peek_top: empty stack")
-    })
+    SKind::gets(|st| *st.last().expect("peek_top: empty stack"))
 }
 
 // ── Programs ─────────────────────────────────────────────────────────────────

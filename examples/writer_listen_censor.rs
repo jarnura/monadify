@@ -12,7 +12,7 @@
 
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
-use monadify::transformers::writer::{MonadWriter, Writer, WriterTKind};
+use monadify::transformers::writer::{Writer, WriterTKind};
 
 /// Type alias: a computation that accumulates a `Vec<String>` log and produces `A`.
 /// `Writer<W, A> = WriterT<W, IdentityKind, A>`.
@@ -25,7 +25,7 @@ type WKind = WriterTKind<Vec<String>, IdentityKind>;
 
 /// Appends a single log entry, yielding unit.
 fn step(s: &str) -> Logged<()> {
-    <WKind as MonadWriter<Vec<String>, (), IdentityKind>>::tell(vec![s.to_string()])
+    WKind::tell(vec![s.to_string()])
 }
 
 // ── Shared sub-computation ────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ fn auth_steps() -> Logged<()> {
 fn listen_demo() -> Logged<Vec<String>> {
     mdo! {
         WKind;
-        captured <- <WKind as MonadWriter<Vec<String>, (), IdentityKind>>::listen(auth_steps());
+        captured <- auth_steps().listen();
         pure(captured.1)
     }
 }
@@ -69,7 +69,7 @@ fn censor_demo() -> Logged<()> {
                 })
                 .collect()
         };
-        _ <- <WKind as MonadWriter<Vec<String>, (), IdentityKind>>::censor(redact, auth_steps());
+        _ <- auth_steps().censor(redact);
         _ <- step("main: done");
         pure(())
     }

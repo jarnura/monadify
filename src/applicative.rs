@@ -85,6 +85,7 @@ pub mod kind {
         ///
         /// # Returns
         /// The value wrapped in the Kind applicative structure, `Self::Of<T>`.
+        #[must_use]
         fn pure(value: T) -> Self::Of<T>;
     }
 
@@ -185,6 +186,7 @@ pub mod kind {
     /// );
     /// assert_eq!(lifted_vec, vec![false, true, false]);
     /// ```
+    #[must_use]
     pub fn lift_a1<F, A, B, FuncImpl>(func: FuncImpl, fa: F::Of<A>) -> F::Of<B>
     where
         F: Applicative<RcFn<A, B>> + Apply<A, B> + Kind1,

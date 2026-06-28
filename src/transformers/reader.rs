@@ -59,7 +59,7 @@ pub mod kind {
     //! assert_eq!((mapped_val.run_reader_t)(config1.clone()), Some(20));
     //!
     //! // 3. Using 'bind'
-    //! let ask_op_for_bind: ConfigReaderOption<Config> = <ConfigReaderOptionKind as MonadReader<Config, Config, OptionKind>>::ask();
+    //! let ask_op_for_bind: ConfigReaderOption<Config> = ConfigReaderOptionKind::ask();
     //! let computation: ConfigReaderOption<String> = ConfigReaderOptionKind::bind(
     //!     ask_op_for_bind, // Gets Config
     //!     |config: Config| {
@@ -130,23 +130,20 @@ pub mod kind {
         /// The core function that defines the `ReaderT` computation.
         /// It takes an environment `R` and returns the result wrapped in the inner monad `MKind::Of<A>`.
         pub run_reader_t: Rc<dyn Fn(R) -> MKind::Of<A> + 'static>, // Changed MMarker::Applied to MKind::Of
-        _phantom_r: PhantomData<R>,
-        _phantom_m_kind: PhantomData<MKind>, // Changed _phantom_m_marker to _phantom_m_kind
-        _phantom_a: PhantomData<A>,
+        _phantom: PhantomData<(R, MKind, A)>,
     }
 
     impl<R, MKind: Kind1, A> ReaderT<R, MKind, A> {
         // Changed MMarker to MKind, HKT1 to Kind1
         /// Creates a new `ReaderT` from a function `R -> MKind::Of<A>`.
+        #[must_use]
         pub fn new<F>(f: F) -> Self
         where
             F: Fn(R) -> MKind::Of<A> + 'static, // Changed MMarker::Applied to MKind::Of
         {
             ReaderT {
                 run_reader_t: Rc::new(f),
-                _phantom_r: PhantomData,
-                _phantom_m_kind: PhantomData, // Changed _phantom_m_marker to _phantom_m_kind
-                _phantom_a: PhantomData,
+                _phantom: PhantomData,
             }
         }
 
@@ -165,6 +162,7 @@ pub mod kind {
         /// let result = (comp.local(|env: i32| env + 10).run_reader_t)(5);
         /// assert_eq!(result, Identity(30)); // (5+10)*2 = 30
         /// ```
+        #[must_use]
         pub fn local<F>(self, f: F) -> Self
         where
             R: 'static,
@@ -364,6 +362,7 @@ pub mod kind {
         /// let env = MyConfig { id: 123 };
         /// assert_eq!((get_config.run_reader_t)(env.clone()), Some(env));
         /// ```
+        #[must_use]
         fn ask() -> ReaderT<REnv, MKind, REnv>
         where
             REnv: Clone + 'static,
@@ -404,6 +403,7 @@ pub mod kind {
         /// assert_eq!((get_value_str.run_reader_t)(initial_config.clone()), Some("Value: 10".to_string()));
         /// assert_eq!((modified_computation.run_reader_t)(initial_config.clone()), Some("New Value: 20".to_string()));
         /// ```
+        #[must_use]
         fn local<FMapEnv>(
             map_env_fn: FMapEnv,
             computation: ReaderT<REnv, MKind, AVal>,
@@ -465,6 +465,7 @@ pub mod kind {
         /// let get_env: ReaderT<Cfg, OptionKind, Cfg> = CfgReaderKind::ask();
         /// assert_eq!((get_env.run_reader_t)(Cfg { id: 7 }), Some(Cfg { id: 7 }));
         /// ```
+        #[must_use]
         pub fn ask() -> ReaderT<R, MKindImpl, R>
         where
             R: Clone + 'static,

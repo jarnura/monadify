@@ -93,6 +93,7 @@ pub mod kind {
         /// let nested_none: Option<Option<i32>> = Some(None);
         /// assert_eq!(OptionKind::join(nested_none), None);
         /// ```
+        #[must_use]
         fn join(mma: Self::Of<Self::Of<A>>) -> Self::Of<A>; // Changed Applied to Of
     }
 
@@ -135,6 +136,7 @@ pub mod kind {
         /// Takes a value in context (`Self::Of<A>`) and a function (`A -> Self::Of<B>`).
         /// It applies the function to the unwrapped value (if present/valid) and returns
         /// the resulting context `Self::Of<B>`.
+        #[must_use]
         fn bind(
             input: Self::Of<A>,
             func: impl FnMut(A) -> Self::Of<B> + Clone + 'static,
@@ -251,7 +253,7 @@ pub mod kind {
         /// `None` becomes `None`.
         fn join(mma: Self::Of<Self::Of<A>>) -> Self::Of<A> {
             // mma is Option<Option<A>>. Changed Applied to Of
-            mma.and_then(core::convert::identity)
+            mma.flatten()
         }
     }
 
@@ -323,6 +325,7 @@ pub mod kind {
     /// let result: Option<f64> = bind::<OptionKind, _, _, _>(half, opt_val);
     /// assert_eq!(result, None);
     /// ```
+    #[must_use]
     pub fn bind<F, A, B, FuncImpl>(
         func: FuncImpl,
         ma: F::Of<A>, // Changed Applied to Of

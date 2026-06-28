@@ -33,6 +33,7 @@ impl<A, B> CFnOnce<A, B> {
     ///
     /// # Returns
     /// A new `CFnOnce<A, B>` instance.
+    #[must_use]
     pub fn new<F>(f: F) -> Self
     where
         F: FnOnce(A) -> B + 'static,
@@ -143,6 +144,7 @@ impl<A, B> RcFn<A, B> {
     ///
     /// # Returns
     /// A new `RcFn<A, B>` instance whose clone shares the same closure allocation.
+    #[must_use]
     pub fn new<F>(f: F) -> Self
     where
         F: Fn(A) -> B + 'static,

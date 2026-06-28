@@ -105,9 +105,7 @@ pub mod kind {
     pub struct ExceptT<E, MKind: Kind1, A> {
         /// The wrapped inner computation: `MKind::Of<Result<A, E>>` (value-or-error).
         pub run_except_t: MKind::Of<Result<A, E>>,
-        _phantom_e: PhantomData<E>,
-        _phantom_m_kind: PhantomData<MKind>,
-        _phantom_a: PhantomData<A>,
+        _phantom: PhantomData<(E, MKind, A)>,
     }
 
     // Manual `Clone` bounded on the projected inner type (mirrors `WriterT`): a
@@ -120,21 +118,18 @@ pub mod kind {
         fn clone(&self) -> Self {
             ExceptT {
                 run_except_t: self.run_except_t.clone(),
-                _phantom_e: PhantomData,
-                _phantom_m_kind: PhantomData,
-                _phantom_a: PhantomData,
+                _phantom: PhantomData,
             }
         }
     }
 
     impl<E, MKind: Kind1, A> ExceptT<E, MKind, A> {
         /// Creates a new `ExceptT` from an inner value `MKind::Of<Result<A, E>>`.
+        #[must_use]
         pub fn new(inner: MKind::Of<Result<A, E>>) -> Self {
             ExceptT {
                 run_except_t: inner,
-                _phantom_e: PhantomData,
-                _phantom_m_kind: PhantomData,
-                _phantom_a: PhantomData,
+                _phantom: PhantomData,
             }
         }
     }
@@ -326,6 +321,7 @@ pub mod kind {
         /// `Err(e) -> Err(f(e))`, `Ok(a) -> Ok(a)` (inner `Functor`).
         ///
         /// The Rust analog of Haskell's `withExceptT`.
+        #[must_use]
         pub fn with_except_t<E2, F>(self, f: F) -> ExceptT<E2, MKind, A>
         where
             E: 'static,
@@ -345,6 +341,7 @@ pub mod kind {
         /// Lifts a success value onto the `Ok` branch — the ergonomic concrete form of
         /// `MonadError::lift_either(Ok(_))` (and of `Applicative::pure`). The generic
         /// `MonadError` trait remains for code generic over the inner monad.
+        #[must_use]
         pub fn ok(value: A) -> Self
         where
             E: 'static,
@@ -356,6 +353,7 @@ pub mod kind {
         }
 
         /// Short-circuits with an error — the ergonomic concrete form of `MonadError::throw_error`.
+        #[must_use]
         pub fn throw(error: E) -> Self
         where
             E: 'static,
@@ -367,6 +365,7 @@ pub mod kind {
         }
 
         /// Embeds a pure `Result<A, E>` — the ergonomic concrete form of `MonadError::lift_either`.
+        #[must_use]
         pub fn from_result(r: Result<A, E>) -> Self
         where
             E: 'static,
@@ -379,6 +378,7 @@ pub mod kind {
 
         /// Chainable recovery: runs `self`, and on `Err(e)` runs `handler(e)` instead — the
         /// method form of `MonadError::catch_error`.
+        #[must_use]
         pub fn catch<F>(self, handler: F) -> Self
         where
             E: 'static,
@@ -423,6 +423,7 @@ pub mod kind {
         Self: Sized,
     {
         /// Injects an error, short-circuiting: `MKind::pure(Err(e))`. The primitive.
+        #[must_use]
         fn throw_error(e: E) -> ExceptT<E, MKind, A>
         where
             E: 'static,
@@ -432,6 +433,7 @@ pub mod kind {
 
         /// Runs `m`; if it produced `Err(e)`, runs `handler(e)` instead;
         /// otherwise passes the `Ok` value through unchanged.
+        #[must_use]
         fn catch_error<F>(m: ExceptT<E, MKind, A>, handler: F) -> ExceptT<E, MKind, A>
         where
             E: 'static,
@@ -443,6 +445,7 @@ pub mod kind {
             F: Fn(E) -> ExceptT<E, MKind, A> + Clone + 'static;
 
         /// Embeds a pure `Result<A, E>` directly: `MKind::pure(r)`.
+        #[must_use]
         fn lift_either(r: Result<A, E>) -> ExceptT<E, MKind, A>
         where
             E: 'static,

@@ -10,7 +10,7 @@
 
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
-use monadify::transformers::writer::{MonadWriter, Writer, WriterTKind};
+use monadify::transformers::writer::{Writer, WriterTKind};
 
 /// Type alias: a computation that accumulates a `String` trace log and
 /// produces a value `A`.
@@ -24,7 +24,7 @@ type WKind = WriterTKind<String, IdentityKind>;
 
 /// Appends a single trace line to the log, yielding unit.
 fn trace(line: String) -> Traced<()> {
-    <WKind as MonadWriter<String, (), IdentityKind>>::tell(line)
+    WKind::tell(line)
 }
 
 // ── Step combinators ─────────────────────────────────────────────────────────

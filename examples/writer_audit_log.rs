@@ -9,7 +9,7 @@
 
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
-use monadify::transformers::writer::{MonadWriter, Writer, WriterTKind};
+use monadify::transformers::writer::{Writer, WriterTKind};
 
 /// Type alias: a computation that accumulates a `Vec<String>` audit log and
 /// produces a value `A`.
@@ -23,7 +23,7 @@ type WKind = WriterTKind<Vec<String>, IdentityKind>;
 
 /// Appends a single audit entry to the log, yielding unit.
 fn step(s: &str) -> Logged<()> {
-    <WKind as MonadWriter<Vec<String>, (), IdentityKind>>::tell(vec![s.to_string()])
+    WKind::tell(vec![s.to_string()])
 }
 
 // ── Pipeline ─────────────────────────────────────────────────────────────────

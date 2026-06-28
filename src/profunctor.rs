@@ -35,6 +35,7 @@ pub trait Profunctor<B, C> {
     ///
     /// # Returns
     /// A new profunctor instance `Self::Pro<A, D>`.
+    #[must_use]
     fn dimap<A, D, A2B, C2D>(self, a2b: A2B, c2d: C2D) -> Self::Pro<A, D>
     where
         A2B: Fn(A) -> B + 'static,
@@ -99,10 +100,12 @@ impl<B, C> Profunctor<B, C> for CFnOnce<B, C> {
 pub trait Strong<A, B>: Profunctor<A, B> {
     /// Adapts the profunctor to operate on the first component of a pair.
     /// If `self` is `P<A,B>`, `first` returns `P<(A,C), (B,C)>`.
+    #[must_use]
     fn first<C: 'static>(self) -> Self::Pro<(A, C), (B, C)>;
 
     /// Adapts the profunctor to operate on the second component of a pair.
     /// If `self` is `P<A,B>`, `second` returns `P<(C,A), (C,B)>`.
+    #[must_use]
     fn second<C: 'static>(self) -> Self::Pro<(C, A), (C, B)>;
 }
 
@@ -133,10 +136,12 @@ impl<A: 'static, B: 'static> Strong<A, B> for RcFn<A, B> {
 pub trait Choice<A, B>: Profunctor<A, B> {
     /// Adapts the profunctor to operate on the `Err` variant of a `Result`.
     /// If `self` is `P<A,B>`, `left` returns `P<Result<C,A>, Result<C,B>>`.
+    #[must_use]
     fn left<C>(self) -> Self::Pro<Result<C, A>, Result<C, B>>;
 
     /// Adapts the profunctor to operate on the `Ok` variant of a `Result`.
     /// If `self` is `P<A,B>`, `right` returns `P<Result<A,C>, Result<B,C>>`.
+    #[must_use]
     fn right<C>(self) -> Self::Pro<Result<A, C>, Result<B, C>>;
 }
 
@@ -180,10 +185,7 @@ pub struct Optic<POuter: Profunctor<S, T>, PInner: Profunctor<A, B>, S, T, A, B>
     /// The function that transforms an inner profunctor to an outer profunctor.
     /// `Box<dyn FnOnce(PInner) -> POuter>`
     pub optic: Box<dyn FnOnce(PInner) -> POuter>,
-    _s: PhantomData<S>,
-    _t: PhantomData<T>,
-    _a: PhantomData<A>,
-    _b: PhantomData<B>,
+    _marker: PhantomData<(S, T, A, B)>,
 }
 
 /// A `Lens` is a type of Optic that focuses on a part `A` of a whole `S`,
@@ -240,6 +242,7 @@ impl<PA: Strong<S, T>, PB: Strong<A, B>, S: 'static, T: 'static, A: 'static, B: 
 ///
 /// # Returns
 /// The extracted part `A`.
+#[must_use]
 pub fn view<S: 'static, T: 'static, A: 'static, B: 'static>(
     getter: AGetter<S, T, A, B>,
     s: S,
@@ -337,6 +340,7 @@ impl<R: 'static, AStrong: 'static, BStrong: 'static> Strong<AStrong, BStrong>
 ///   - Returns a pair:
 ///     - The focused part `A`.
 ///     - A function `RcFn<B, T>` that takes a new part `B` and reconstructs the whole `T`.
+#[must_use]
 pub fn lens_<PO, PI, PBC, S: 'static, T: 'static, A: 'static, B: 'static>(
     to: RcFn<S, (A, RcFn<B, T>)>,
 ) -> Lens<PO, PBC, S, T, A, B>
@@ -355,10 +359,7 @@ where
     };
     Lens(Optic {
         optic: Box::new(optics_fn),
-        _s: PhantomData,
-        _t: PhantomData,
-        _a: PhantomData,
-        _b: PhantomData,
+        _marker: PhantomData,
     })
 }
 
@@ -372,6 +373,7 @@ where
 ///
 /// # Returns
 /// A `Lens<PO, PI, S, T, A, B>`. The profunctor types `PO` and `PI` are usually inferred.
+#[must_use]
 pub fn lens<PO, PI, S: Copy + 'static, T: 'static, A: 'static, B: 'static>(
     s2a: RcFn<S, A>,
     s2b2t: RcFn<S, RcFn<B, T>>,
@@ -396,6 +398,7 @@ where
 /// Allows getting `A` and setting `A` to `B`, resulting in `(B, C)`.
 ///
 /// Type parameters `PA` and `PS` are the profunctor types involved, usually inferred.
+#[must_use]
 pub fn _1<
     A: 'static,
     B: 'static,
@@ -405,10 +408,7 @@ pub fn _1<
 >() -> Lens<PS, PA, (A, C), (B, C), A, B> {
     Lens(Optic {
         optic: Box::new(Strong::first),
-        _s: PhantomData,
-        _t: PhantomData,
-        _a: PhantomData,
-        _b: PhantomData,
+        _marker: PhantomData,
     })
 }
 
@@ -416,6 +416,7 @@ pub fn _1<
 /// Allows getting `A` and setting `A` to `B`, resulting in `(C, B)`.
 ///
 /// Type parameters `PA` and `PS` are the profunctor types involved, usually inferred.
+#[must_use]
 pub fn _2<
     A: 'static,
     B: 'static,
@@ -425,10 +426,7 @@ pub fn _2<
 >() -> Lens<PS, PA, (C, A), (C, B), A, B> {
     Lens(Optic {
         optic: Box::new(Strong::second),
-        _s: PhantomData,
-        _t: PhantomData,
-        _a: PhantomData,
-        _b: PhantomData,
+        _marker: PhantomData,
     })
 }
 
@@ -464,6 +462,7 @@ pub struct Check {
 
 /// A `Lens` that focuses on the `key` field of a `Check` struct.
 /// Allows getting `check.key` and setting it.
+#[must_use]
 pub fn _key<PO, PI>() -> Lens<PO, PI, Check, Check, i8, i8>
 where
     PO: Strong<Check, Check>,
@@ -493,6 +492,7 @@ where
 ///
 /// # Returns
 /// A new profunctor `Profunctor::Pro<A, C>`.
+#[must_use]
 pub fn lcmap<A, B, C, F, Pbc, Pac>(a2b: F, profunctor: Pbc) -> Pac
 where
     A: 'static,
@@ -515,6 +515,7 @@ where
 ///
 /// # Returns
 /// A new profunctor `Profunctor::Pro<A, C>`.
+#[must_use]
 pub fn rmap<A, B, C, F, Pab, Pac>(b2c: F, profunctor: Pab) -> Pac
 where
     A: 'static,

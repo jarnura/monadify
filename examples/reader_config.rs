@@ -7,7 +7,7 @@
 
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
-use monadify::transformers::reader::{MonadReader, Reader, ReaderT, ReaderTKind};
+use monadify::transformers::reader::{Reader, ReaderT, ReaderTKind};
 
 /// Application configuration: base rate and scaling factor.
 #[derive(Clone, Debug, PartialEq)]
@@ -50,7 +50,7 @@ fn compute_adjusted_rate(base: f64, factor: f64) -> ConfigReader<f64> {
 
 /// Helper: access the entire config with `ask()`.
 fn ask_config() -> ConfigReader<AppConfig> {
-    <ReaderKind as MonadReader<AppConfig, AppConfig, IdentityKind>>::ask()
+    ReaderKind::ask()
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────

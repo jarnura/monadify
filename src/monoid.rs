@@ -41,6 +41,7 @@
 pub trait Semigroup {
     /// Combines two values associatively. Consumes both operands so the
     /// implementation can reuse their allocations (e.g. `String`/`Vec`).
+    #[must_use]
     fn combine(self, other: Self) -> Self;
 }
 
@@ -50,6 +51,7 @@ pub trait Semigroup {
 /// `empty().combine(x) == x` and `x.combine(empty()) == x`.
 pub trait Monoid: Semigroup {
     /// The identity element: combining it with any value yields that value.
+    #[must_use]
     fn empty() -> Self;
 }
 

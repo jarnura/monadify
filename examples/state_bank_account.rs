@@ -10,7 +10,7 @@
 
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
-use monadify::transformers::state::{MonadState, State, StateTKind};
+use monadify::transformers::state::{State, StateTKind};
 
 /// Type alias: a computation that threads an `i64` balance (in cents) and
 /// returns an `Identity<A>`. `State<S, A> = StateT<S, IdentityKind, A>`.
@@ -23,17 +23,17 @@ type SKind = StateTKind<i64, IdentityKind>;
 
 /// Deposits `cents` into the account (increases the balance).
 fn deposit(cents: i64) -> Account<()> {
-    <SKind as MonadState<i64, (), IdentityKind>>::modify(move |b| b + cents)
+    SKind::modify(move |b| b + cents)
 }
 
 /// Withdraws `cents` from the account (decreases the balance).
 fn withdraw(cents: i64) -> Account<()> {
-    <SKind as MonadState<i64, (), IdentityKind>>::modify(move |b| b - cents)
+    SKind::modify(move |b| b - cents)
 }
 
 /// Reads the current balance without modifying it.
 fn balance() -> Account<i64> {
-    <SKind as MonadState<i64, i64, IdentityKind>>::get()
+    SKind::get()
 }
 
 // ── The ledger computation ───────────────────────────────────────────────────

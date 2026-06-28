@@ -52,6 +52,7 @@ pub mod kind {
         ///
         /// # Returns
         /// A new Kind-structured value `Self::Of<B>`.
+        #[must_use]
         fn apply(
             value_container: Self::Of<A>,
             function_container: Self::Of<RcFn<A, B>>,
@@ -155,6 +156,7 @@ pub mod kind {
     ///
     /// Given `func: A -> RcFn<B, C>`, `fa: F::Of<A>`, and `fb: F::Of<B>`,
     /// `lift2` produces `F::Of<C>`.
+    #[must_use]
     pub fn lift2<F, A, B, C, FuncImpl>(
         func: FuncImpl, // A -> RcFn<B, C>
         fa: F::Of<A>,
@@ -175,6 +177,7 @@ pub mod kind {
     ///
     /// Given `func: A -> RcFn<B, RcFn<C, D>>`, `fa: F::Of<A>`, `fb: F::Of<B>`,
     /// and `fc: F::Of<C>`, `lift3` produces `F::Of<D>`.
+    #[must_use]
     pub fn lift3<F, A, B, C, D, FuncImpl>(
         func: FuncImpl, // A -> RcFn<B, RcFn<C, D>>
         fa: F::Of<A>,
@@ -196,6 +199,7 @@ pub mod kind {
 
     /// Combines two Kind-encoded actions, keeping only the result of the first.
     /// Often denoted as `<*`.
+    #[must_use]
     pub fn apply_first<F, A, B>(fa: F::Of<A>, fb: F::Of<B>) -> F::Of<A>
     where
         F: Apply<B, A> + Functor<A, RcFn<B, A>> + Kind1,
@@ -208,6 +212,7 @@ pub mod kind {
 
     /// Combines two Kind-encoded actions, keeping only the result of the second.
     /// Often denoted as `*>`.
+    #[must_use]
     pub fn apply_second<F, A, B>(fa: F::Of<A>, fb: F::Of<B>) -> F::Of<B>
     where
         F: Apply<B, B> + Functor<A, RcFn<B, B>> + Kind1,
