@@ -159,6 +159,25 @@ cargo run --example writer_listen_censor --features do-notation
 cargo run --example writer_eval_trace    --features do-notation
 ```
 
+### Except monad examples
+
+These demonstrate the `ExceptT` Except monad short-circuiting on the first error
+via `mdo!` do-notation — a failed step aborts the computation, and `catch_error`
+can recover:
+
+- `except_form_validation.rs` — user-registration form validation that short-circuits on the first invalid field
+- `except_safe_calculator.rs` — calculator that throws on divide-by-zero / domain errors and recovers via `catch_error`
+- `except_config_loader.rs` — parse config string fields, unifying parse errors via `with_except_t`
+- `except_order_pipeline.rs` — order pipeline (validate → reserve → charge) that aborts on the first failure
+
+Run any of them with (each requires the `do-notation` feature):
+```bash
+cargo run --example except_form_validation --features do-notation
+cargo run --example except_safe_calculator --features do-notation
+cargo run --example except_config_loader   --features do-notation
+cargo run --example except_order_pipeline   --features do-notation
+```
+
 ## Building the Project
 
 To build the library:

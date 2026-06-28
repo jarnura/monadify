@@ -80,3 +80,19 @@ required-features = ["do-notation"]
 [[example]]
 name = "writer_eval_trace"
 required-features = ["do-notation"]
+
+[[example]]
+name = "except_form_validation"
+required-features = ["do-notation"]
+
+[[example]]
+name = "except_safe_calculator"
+required-features = ["do-notation"]
+
+[[example]]
+name = "except_config_loader"
+required-features = ["do-notation"]
+
+[[example]]
+name = "except_order_pipeline"
+required-features = ["do-notation"]
