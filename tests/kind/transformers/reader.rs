@@ -168,6 +168,66 @@ fn test_reader_t_kind_monad_law_associativity() {
     assert_eq!(val_lhs, "15");
 }
 
+// --- Parity tests: inherent ergonomic forms vs trait UFCS forms ---
+
+#[test]
+fn test_reader_t_inherent_ask_parity_identity() {
+    let env = EnvConfig { val: 42 };
+
+    // Inherent ergonomic form
+    let ask_inherent: TestReader<EnvConfig> = TestReaderKind::ask();
+    // Trait UFCS form
+    let ask_trait: TestReader<EnvConfig> =
+        <TestReaderKind as MonadReader<EnvConfig, EnvConfig, IdentityKind>>::ask();
+
+    let result_inherent = (ask_inherent.run_reader_t)(env.clone());
+    let result_trait = (ask_trait.run_reader_t)(env.clone());
+    assert_eq!(result_inherent, result_trait);
+    assert_eq!(result_inherent, Identity(EnvConfig { val: 42 }));
+}
+
+#[test]
+fn test_reader_t_inherent_ask_parity_option() {
+    use monadify::ReaderT as RT;
+    type OptReaderKind = monadify::ReaderTKind<i32, monadify::OptionKind>;
+
+    let env: i32 = 99;
+
+    // Inherent ergonomic form
+    let ask_inherent: RT<i32, monadify::OptionKind, i32> = OptReaderKind::ask();
+    // Trait UFCS form
+    let ask_trait: RT<i32, monadify::OptionKind, i32> =
+        <OptReaderKind as MonadReader<i32, i32, monadify::OptionKind>>::ask();
+
+    assert_eq!(
+        (ask_inherent.run_reader_t)(env),
+        (ask_trait.run_reader_t)(env),
+    );
+    assert_eq!((ask_inherent.run_reader_t)(env), Some(99));
+}
+
+#[test]
+fn test_reader_t_inherent_local_parity_identity() {
+    let env = EnvConfig { val: 5 };
+    let base: TestReader<i32> = ReaderT::new(|cfg: EnvConfig| Identity(cfg.val * 2));
+    // A non-capturing closure is Copy so we can pass it to both forms.
+    let modifier = |mut cfg: EnvConfig| {
+        cfg.val += 10;
+        cfg
+    };
+
+    // Method (inherent) form: comp.local(f)
+    let local_method = base.clone().local(modifier);
+    // Trait UFCS form: MonadReader::local(f, comp)
+    let local_trait = TestReaderKind::local(modifier, base);
+
+    let result_method = (local_method.run_reader_t)(env.clone());
+    let result_trait = (local_trait.run_reader_t)(env.clone());
+    assert_eq!(result_method, result_trait);
+    // env.val=5, modifier adds 10 -> 15, *2 -> 30
+    assert_eq!(result_method, Identity(30));
+}
+
 // Helper to run ReaderT with Option inner monad and compare
 fn run_kind_reader_t_option<
     R: Clone + 'static,

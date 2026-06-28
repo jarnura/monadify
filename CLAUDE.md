@@ -35,6 +35,15 @@ Core infrastructure lives in `src/kind_based/kind.rs`.
   code).
   `src/transformers/trans.rs` — `MonadTrans` (`lift`, impl'd for all four
   transformers). `src/monoid.rs` — `Semigroup`/`Monoid` (`combine`/`empty`).
+- **Ergonomic inherent forms (all transformers).** To avoid the verbose
+  `<Marker as MonadX<…>>::method()` UFCS at concrete call sites, each transformer
+  exposes inherent forms of its `MonadX` surface that delegate to the trait with
+  identical bounds (the trait stays for code generic over the inner monad):
+  constructors whose value type is fixed by the result live on the **Kind marker**
+  (`ReaderTKind::ask`; `StateTKind::{state,get,put,modify,gets}`;
+  `WriterTKind::{tell,writer}`; plus `ExceptT::{ok,throw,from_result}` on the type),
+  while computation-consuming ops are chainable **methods**
+  (`ReaderT::local`, `WriterT::{listen,censor}`, `ExceptT::{catch,with_except_t}`).
   `src/utils.rs` — `fn0!`..`fn3!` macros.
 - `src/legacy/` — the older associated-type implementation, behind the `legacy`
   feature flag (kept for comparison/benchmarking; not the default).

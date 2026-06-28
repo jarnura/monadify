@@ -204,3 +204,43 @@ fn option_inner_pure_empty_log() {
     let w: OptW<i32> = OptWKind::pure(7);
     assert_eq!(w.run_writer_t, Some((7, String::empty())));
 }
+
+// ── Inherent ergonomic API parity: each inherent form == the trait form ───────
+
+/// `WKind::tell(w)` must equal `<WKind as MonadWriter<..>>::tell(w)`.
+#[test]
+fn inherent_tell_parity() {
+    let trait_form = <WKind as MonadWriter<String, (), IdentityKind>>::tell("hello".to_string());
+    let inherent_form = WKind::tell("hello".to_string());
+    assert_eq!(run_id(trait_form), run_id(inherent_form));
+}
+
+/// `WKind::writer(a, w)` must equal `<WKind as MonadWriter<..>>::writer(a, w)`.
+#[test]
+fn inherent_writer_parity() {
+    let trait_form =
+        <WKind as MonadWriter<String, i32, IdentityKind>>::writer(42, "note".to_string());
+    let inherent_form = WKind::writer(42, "note".to_string());
+    assert_eq!(run_id(trait_form), run_id(inherent_form));
+}
+
+/// `m.listen()` must equal `<WKind as MonadWriter<..>>::listen(m)`.
+#[test]
+fn inherent_listen_parity() {
+    let m1 = tell("xyz");
+    let m2 = tell("xyz");
+    let trait_form = <WKind as MonadWriter<String, (), IdentityKind>>::listen(m1);
+    let inherent_form = m2.listen();
+    assert_eq!(run_id(trait_form), run_id(inherent_form));
+}
+
+/// `m.censor(f)` must equal `<WKind as MonadWriter<..>>::censor(f, m)`.
+#[test]
+fn inherent_censor_parity() {
+    let m1 = tell("quiet");
+    let m2 = tell("quiet");
+    let f = |w: String| w.to_uppercase();
+    let trait_form = <WKind as MonadWriter<String, (), IdentityKind>>::censor(f, m1);
+    let inherent_form = m2.censor(f);
+    assert_eq!(run_id(trait_form), run_id(inherent_form));
+}

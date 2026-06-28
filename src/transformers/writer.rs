@@ -42,7 +42,7 @@ pub mod kind {
     //! type LoggedKind = WriterTKind<String, IdentityKind>;
     //!
     //! // `tell` appends to the log and yields unit.
-    //! let step = |msg: &str| <LoggedKind as MonadWriter<String, (), IdentityKind>>::tell(msg.to_string());
+    //! let step = |msg: &str| LoggedKind::tell(msg.to_string());
     //!
     //! // Sequence two log-writes; the logs concatenate monoidally.
     //! let prog: Logged<()> = LoggedKind::bind(step("hello "), move |_| step("world"));
@@ -129,6 +129,61 @@ pub mod kind {
         type Of<A> = WriterT<W, MKind, A>;
     }
     // Kind1 is provided by the blanket impl in kind_based/kind.rs.
+
+    impl<W, MKindImpl: Kind1> WriterTKind<W, MKindImpl> {
+        /// Appends `w` to the log and produces unit — the ergonomic alternative to
+        /// `<WriterTKind<W, MKindImpl> as MonadWriter<W, (), MKindImpl>>::tell(w)`.
+        ///
+        /// Avoids the UFCS syntax for the common case. Generic code that is
+        /// parameterized over the concrete Kind marker should continue to use the
+        /// trait form.
+        ///
+        /// # Example
+        /// ```
+        /// use monadify::transformers::writer::{Writer, WriterTKind};
+        /// use monadify::identity::{Identity, IdentityKind};
+        ///
+        /// let w: Writer<String, ()> =
+        ///     WriterTKind::<String, IdentityKind>::tell("hello".to_string());
+        /// let Identity(((), log)) = w.run_writer_t;
+        /// assert_eq!(log, "hello");
+        /// ```
+        pub fn tell(w: W) -> WriterT<W, MKindImpl, ()>
+        where
+            W: 'static,
+            MKindImpl: applicative_kind::Applicative<((), W)> + 'static,
+            MKindImpl::Of<((), W)>: 'static,
+        {
+            <Self as MonadWriter<W, (), MKindImpl>>::tell(w)
+        }
+
+        /// Embeds a `(value, log)` pair directly — the ergonomic alternative to
+        /// `<WriterTKind<W, MKindImpl> as MonadWriter<W, A, MKindImpl>>::writer(value, log)`.
+        ///
+        /// Avoids the UFCS syntax for the common case. Generic code that is
+        /// parameterized over the concrete Kind marker should continue to use the
+        /// trait form.
+        ///
+        /// # Example
+        /// ```
+        /// use monadify::transformers::writer::{Writer, WriterTKind};
+        /// use monadify::identity::{Identity, IdentityKind};
+        ///
+        /// let w: Writer<String, i32> =
+        ///     WriterTKind::<String, IdentityKind>::writer(42, "note".to_string());
+        /// let Identity((val, log)) = w.run_writer_t;
+        /// assert_eq!((val, log), (42, "note".to_string()));
+        /// ```
+        pub fn writer<A>(value: A, log: W) -> WriterT<W, MKindImpl, A>
+        where
+            W: 'static,
+            A: Clone + 'static,
+            MKindImpl: applicative_kind::Applicative<(A, W)> + 'static,
+            MKindImpl::Of<(A, W)>: 'static,
+        {
+            <Self as MonadWriter<W, A, MKindImpl>>::writer(value, log)
+        }
+    }
 
     /// A type alias for `WriterT` with [`IdentityKind`] as the inner monad.
     /// This is the plain Writer monad: `Writer<W, A>` wraps `Identity<(A, W)>`.
@@ -319,6 +374,61 @@ pub mod kind {
             MKind::Of<(A, W)>: 'static,
         {
             MKind::map(self.run_writer_t, |(_a, w)| w)
+        }
+
+        /// Exposes the accumulated log alongside the value, leaving it in place —
+        /// the chainable method form of
+        /// `<WriterTKind<W, MKind> as MonadWriter<W, A, MKind>>::listen(self)`.
+        ///
+        /// The produced value becomes `(A, W)` and the log remains `W`.
+        ///
+        /// # Example
+        /// ```
+        /// use monadify::transformers::writer::{Writer, WriterTKind, MonadWriter};
+        /// use monadify::identity::{Identity, IdentityKind};
+        ///
+        /// let w: Writer<String, ()> =
+        ///     WriterTKind::<String, IdentityKind>::tell("xyz".to_string());
+        /// let Identity((((), exposed), log)) = w.listen().run_writer_t;
+        /// assert_eq!(exposed, "xyz");
+        /// assert_eq!(log, "xyz");
+        /// ```
+        pub fn listen(self) -> WriterT<W, MKind, (A, W)>
+        where
+            W: Clone + 'static,
+            A: 'static,
+            MKind: functor_kind::Functor<(A, W), ((A, W), W)> + 'static,
+            MKind::Of<(A, W)>: 'static,
+            MKind::Of<((A, W), W)>: 'static,
+        {
+            <WriterTKind<W, MKind> as MonadWriter<W, A, MKind>>::listen(self)
+        }
+
+        /// Rewrites the log with `f`, leaving the value unchanged — the chainable
+        /// method form of
+        /// `<WriterTKind<W, MKind> as MonadWriter<W, A, MKind>>::censor(f, self)`.
+        ///
+        /// The result is `(a, f(w))`.
+        ///
+        /// # Example
+        /// ```
+        /// use monadify::transformers::writer::{Writer, WriterTKind, MonadWriter};
+        /// use monadify::identity::{Identity, IdentityKind};
+        ///
+        /// let w: Writer<String, ()> =
+        ///     WriterTKind::<String, IdentityKind>::tell("quiet".to_string());
+        /// let Identity(((), log)) = w.censor(|s: String| s.to_uppercase()).run_writer_t;
+        /// assert_eq!(log, "QUIET");
+        /// ```
+        pub fn censor<F>(self, f: F) -> Self
+        where
+            W: 'static,
+            A: 'static,
+            MKind: functor_kind::Functor<(A, W), (A, W)> + 'static,
+            MKind::Of<(A, W)>: 'static,
+            F: Fn(W) -> W + Clone + 'static,
+        {
+            <WriterTKind<W, MKind> as MonadWriter<W, A, MKind>>::censor(f, self)
         }
     }
 
