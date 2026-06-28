@@ -9,7 +9,7 @@
 //! Run with: `cargo run --example except_config_loader --features do-notation`
 
 use monadify::monad::kind::Bind;
-use monadify::transformers::except::{Except, ExceptT, ExceptTKind, MonadError};
+use monadify::transformers::except::{Except, ExceptT, ExceptTKind};
 use monadify::{Identity, IdentityKind};
 use std::num::ParseIntError;
 
@@ -42,20 +42,12 @@ fn load(port_s: &str, retries_s: &str) -> Checked<Config> {
     // Build ExceptT<ParseIntError, IdentityKind, u16> from the parse result, then
     // remap the error channel ParseIntError -> ConfigError::BadPort.
     let port_raw: ExceptT<ParseIntError, IdentityKind, u16> =
-        <ExceptTKind<ParseIntError, IdentityKind> as MonadError<
-            ParseIntError,
-            u16,
-            IdentityKind,
-        >>::lift_either(port_s.parse::<u16>());
+        ExceptT::from_result(port_s.parse::<u16>());
     let port_c: Checked<u16> = port_raw.with_except_t(|e| ConfigError::BadPort(e.to_string()));
 
     // Same for retries, remapping to ConfigError::BadRetries.
     let retries_raw: ExceptT<ParseIntError, IdentityKind, u32> =
-        <ExceptTKind<ParseIntError, IdentityKind> as MonadError<
-            ParseIntError,
-            u32,
-            IdentityKind,
-        >>::lift_either(retries_s.parse::<u32>());
+        ExceptT::from_result(retries_s.parse::<u32>());
     let retries_c: Checked<u32> =
         retries_raw.with_except_t(|e| ConfigError::BadRetries(e.to_string()));
 
@@ -63,10 +55,7 @@ fn load(port_s: &str, retries_s: &str) -> Checked<Config> {
     // Short-circuit: Err in port_c skips the inner bind entirely.
     CKind::bind(port_c, move |port| {
         CKind::bind(retries_c.clone(), move |retries| {
-            <CKind as MonadError<ConfigError, Config, IdentityKind>>::lift_either(Ok(Config {
-                port,
-                retries,
-            }))
+            Checked::ok(Config { port, retries })
         })
     })
 }
@@ -115,7 +104,9 @@ fn main() {
 
     println!("\n=== All assertions passed! ===");
     println!("\nKey insight:");
-    println!("  * lift_either      wraps a Result into ExceptT<ParseIntError, IdentityKind, _>.");
+    println!(
+        "  * ExceptT::from_result  wraps a Result into ExceptT<ParseIntError, IdentityKind, _>."
+    );
     println!("  * with_except_t    remaps the error channel: ParseIntError -> ConfigError.");
     println!("  * bind             sequences Checked<_> steps, short-circuiting on Err.");
     println!("  * run_except_t     is a field exposing Identity<Result<Config, ConfigError>>.");

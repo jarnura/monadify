@@ -56,23 +56,31 @@ pub mod kind {
     //! type Checked<A> = Except<String, A>;          // ExceptT<String, IdentityKind, A>
     //! type CheckedKind = ExceptTKind<String, IdentityKind>;
     //!
-    //! // `throw_error` injects an error; the rest of the bind chain is skipped.
-    //! let boom = |msg: &str| <CheckedKind as MonadError<String, i32, IdentityKind>>::throw_error(msg.to_string());
+    //! // `Checked::throw` injects an error; the rest of the bind chain is skipped.
+    //! let boom = |msg: &str| Checked::<i32>::throw(msg.to_string());
     //!
     //! let prog: Checked<i32> = CheckedKind::bind(boom("nope"), move |x| CheckedKind::bind(
-    //!     <CheckedKind as MonadError<String, i32, IdentityKind>>::lift_either(Ok(x + 1)),
-    //!     move |y| <CheckedKind as MonadError<String, i32, IdentityKind>>::lift_either(Ok(y * 2)),
+    //!     Checked::ok(x + 1),
+    //!     move |y| Checked::ok(y * 2),
     //! ));
     //! let Identity(res) = prog.run_except_t;
     //! assert_eq!(res, Err("nope".to_string())); // short-circuited
     //!
-    //! // `catch_error` recovers from the error.
-    //! let recovered: Checked<i32> = <CheckedKind as MonadError<String, i32, IdentityKind>>::catch_error(
-    //!     boom("bad"),
-    //!     |_e| <CheckedKind as MonadError<String, i32, IdentityKind>>::lift_either(Ok(0)),
-    //! );
+    //! // `.catch(..)` recovers from the error.
+    //! let recovered: Checked<i32> = boom("bad").catch(|_e| Checked::ok(0));
     //! let Identity(res2) = recovered.run_except_t;
     //! assert_eq!(res2, Ok(0));
+    //!
+    //! // `from_result` embeds a pure `Result`.
+    //! let from_ok: Checked<i32> = Checked::from_result(Ok(42));
+    //! let Identity(res3) = from_ok.run_except_t;
+    //! assert_eq!(res3, Ok(42));
+    //!
+    //! // For reference, the verbose trait form is still available for generic code:
+    //! let verbose: Checked<i32> =
+    //!     <CheckedKind as MonadError<String, i32, IdentityKind>>::lift_either(Ok(42));
+    //! let Identity(res4) = verbose.run_except_t;
+    //! assert_eq!(res4, Ok(42));
     //! ```
 
     use crate::applicative::kind as applicative_kind;
@@ -311,7 +319,7 @@ pub mod kind {
         }
     }
 
-    // --- Error-channel map (the analog of WriterT's `censor`) ---
+    // --- Error-channel map and ergonomic inherent constructors/combinators ---
 
     impl<E, MKind: Kind1, A> ExceptT<E, MKind, A> {
         /// Maps the error channel `E -> E2`, leaving the success value unchanged:
@@ -332,6 +340,64 @@ pub mod kind {
             ExceptT::new(MKind::map(self.run_except_t, move |r: Result<A, E>| {
                 r.map_err(&mut f)
             }))
+        }
+
+        /// Lifts a success value onto the `Ok` branch — the ergonomic concrete form of
+        /// `MonadError::lift_either(Ok(_))` (and of `Applicative::pure`). The generic
+        /// `MonadError` trait remains for code generic over the inner monad.
+        pub fn ok(value: A) -> Self
+        where
+            E: 'static,
+            A: 'static,
+            MKind: applicative_kind::Applicative<Result<A, E>> + 'static,
+            MKind::Of<Result<A, E>>: 'static,
+        {
+            ExceptT::new(MKind::pure(Ok(value)))
+        }
+
+        /// Short-circuits with an error — the ergonomic concrete form of `MonadError::throw_error`.
+        pub fn throw(error: E) -> Self
+        where
+            E: 'static,
+            A: 'static,
+            MKind: applicative_kind::Applicative<Result<A, E>> + 'static,
+            MKind::Of<Result<A, E>>: 'static,
+        {
+            ExceptT::new(MKind::pure(Err(error)))
+        }
+
+        /// Embeds a pure `Result<A, E>` — the ergonomic concrete form of `MonadError::lift_either`.
+        pub fn from_result(r: Result<A, E>) -> Self
+        where
+            E: 'static,
+            A: 'static,
+            MKind: applicative_kind::Applicative<Result<A, E>> + 'static,
+            MKind::Of<Result<A, E>>: 'static,
+        {
+            ExceptT::new(MKind::pure(r))
+        }
+
+        /// Chainable recovery: runs `self`, and on `Err(e)` runs `handler(e)` instead — the
+        /// method form of `MonadError::catch_error`.
+        pub fn catch<F>(self, handler: F) -> Self
+        where
+            E: 'static,
+            A: 'static,
+            MKind: monad_kind::Bind<Result<A, E>, Result<A, E>>
+                + applicative_kind::Applicative<Result<A, E>>
+                + 'static,
+            MKind::Of<Result<A, E>>: 'static,
+            F: Fn(E) -> ExceptT<E, MKind, A> + Clone + 'static,
+        {
+            ExceptT::new(
+                <MKind as monad_kind::Bind<Result<A, E>, Result<A, E>>>::bind(
+                    self.run_except_t,
+                    move |r: Result<A, E>| match r {
+                        Ok(a) => MKind::pure(Ok(a)),
+                        Err(e) => handler(e).run_except_t,
+                    },
+                ),
+            )
         }
     }
 

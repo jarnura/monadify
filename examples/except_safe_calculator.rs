@@ -1,14 +1,14 @@
 //! Safe calculator using the `Except` monad for domain-error recovery.
 //!
-//! Demonstrates `throw_error`, `lift_either`, and `catch_error` with
+//! Demonstrates `throw`, `ok`, and `catch` with
 //! `ExceptT` over `IdentityKind`.  Division-by-zero and square-root-of-negative
-//! are modelled as typed errors; `catch_error` intercepts them and substitutes
+//! are modelled as typed errors; `catch` intercepts them and substitutes
 //! a fallback value without touching successful computations.
 //!
 //! Run with: `cargo run --example except_safe_calculator --features do-notation`
 
 use monadify::monad::kind::Bind;
-use monadify::transformers::except::{Except, ExceptTKind, MonadError};
+use monadify::transformers::except::{Except, ExceptTKind};
 use monadify::{Identity, IdentityKind};
 
 // ── Error type ────────────────────────────────────────────────────────────────
@@ -36,18 +36,18 @@ type CKind = ExceptTKind<MathError, IdentityKind>;
 /// Divides `a` by `b`.  Throws `DivByZero` when `b == 0.0`.
 fn safe_div(a: f64, b: f64) -> Checked<f64> {
     if b == 0.0 {
-        <CKind as MonadError<MathError, f64, IdentityKind>>::throw_error(MathError::DivByZero)
+        Checked::throw(MathError::DivByZero)
     } else {
-        <CKind as MonadError<MathError, f64, IdentityKind>>::lift_either(Ok(a / b))
+        Checked::ok(a / b)
     }
 }
 
 /// Takes the square root of `x`.  Throws `NegativeSqrt` when `x < 0.0`.
 fn safe_sqrt(x: f64) -> Checked<f64> {
     if x < 0.0 {
-        <CKind as MonadError<MathError, f64, IdentityKind>>::throw_error(MathError::NegativeSqrt)
+        Checked::throw(MathError::NegativeSqrt)
     } else {
-        <CKind as MonadError<MathError, f64, IdentityKind>>::lift_either(Ok(x.sqrt()))
+        Checked::ok(x.sqrt())
     }
 }
 
@@ -84,26 +84,20 @@ fn main() {
     );
     println!("  {:?}  PASSED\n", res3);
 
-    // ── Test 4: catch_error recovers DivByZero with fallback 0.0 ──────────────
-    println!("Test 4: catch_error(safe_div(1.0, 0.0), |_| Ok(0.0)) — recovery");
-    let recovered = <CKind as MonadError<MathError, f64, IdentityKind>>::catch_error(
-        safe_div(1.0, 0.0),
-        |_e| <CKind as MonadError<MathError, f64, IdentityKind>>::lift_either(Ok(0.0)),
-    );
+    // ── Test 4: catch recovers DivByZero with fallback 0.0 ────────────────────
+    println!("Test 4: safe_div(1.0, 0.0).catch(|_| Checked::ok(0.0)) — recovery");
+    let recovered = safe_div(1.0, 0.0).catch(|_| Checked::ok(0.0));
     let Identity(res4) = recovered.run_except_t;
     assert_eq!(res4, Ok(0.0), "expected Ok(0.0), got {:?}", res4);
     println!("  {:?}  PASSED\n", res4);
 
-    // ── Test 5: catch_error over an Ok computation passes through unchanged ────
-    println!("Test 5: catch_error(safe_div(10.0, 2.0), handler) — Ok passes through");
-    let passthrough = <CKind as MonadError<MathError, f64, IdentityKind>>::catch_error(
-        safe_div(10.0, 2.0),
-        |_e| {
-            // Handler must NOT be invoked — if it were, an assertion below would
-            // catch the wrong value (the fallback -1.0).
-            <CKind as MonadError<MathError, f64, IdentityKind>>::lift_either(Ok(-1.0))
-        },
-    );
+    // ── Test 5: catch over an Ok computation passes through unchanged ──────────
+    println!("Test 5: safe_div(10.0, 2.0).catch(handler) — Ok passes through");
+    let passthrough = safe_div(10.0, 2.0).catch(|_e| {
+        // Handler must NOT be invoked — if it were, an assertion below would
+        // catch the wrong value (the fallback -1.0).
+        Checked::ok(-1.0)
+    });
     let Identity(res5) = passthrough.run_except_t;
     assert_eq!(
         res5,
@@ -135,10 +129,10 @@ fn main() {
     // ── Summary ───────────────────────────────────────────────────────────────
     println!("=== All tests passed! ===");
     println!("\nKey insight:");
-    println!("  * throw_error  injects an error and short-circuits the computation.");
-    println!("  * lift_either  embeds a pure Result into the Except monad.");
-    println!("  * catch_error  intercepts Err and runs a recovery handler;");
-    println!("                 Ok values pass through with the handler never called.");
-    println!("  * bind         sequences steps, propagating Err without calling");
-    println!("                 the continuation — total short-circuit semantics.");
+    println!("  * throw  injects an error and short-circuits the computation.");
+    println!("  * ok     lifts a value onto the success branch.");
+    println!("  * catch  intercepts Err and runs a recovery handler;");
+    println!("           Ok values pass through with the handler never called.");
+    println!("  * bind   sequences steps, propagating Err without calling");
+    println!("           the continuation — total short-circuit semantics.");
 }

@@ -20,7 +20,7 @@
 
 use monadify::identity::{Identity, IdentityKind};
 use monadify::mdo;
-use monadify::transformers::except::{Except, ExceptTKind, MonadError};
+use monadify::transformers::except::{Except, ExceptTKind};
 
 // ── Domain types ──────────────────────────────────────────────────────────────
 
@@ -59,11 +59,9 @@ type CKind = ExceptTKind<ValidationError, IdentityKind>;
 /// parameter rather than a captured variable.
 fn check_username(username: String) -> Checked<String> {
     if username.is_empty() {
-        <CKind as MonadError<ValidationError, String, IdentityKind>>::throw_error(
-            ValidationError::EmptyUsername,
-        )
+        Checked::throw(ValidationError::EmptyUsername)
     } else {
-        <CKind as MonadError<ValidationError, String, IdentityKind>>::lift_either(Ok(username))
+        Checked::ok(username)
     }
 }
 
@@ -75,13 +73,9 @@ fn check_username(username: String) -> Checked<String> {
 /// move that would turn the depth-0 closure into `FnOnce`.
 fn check_password(username: String, password: String, email: String) -> Checked<(String, String)> {
     if password.len() < 8 {
-        <CKind as MonadError<ValidationError, (String, String), IdentityKind>>::throw_error(
-            ValidationError::PasswordTooShort,
-        )
+        Checked::throw(ValidationError::PasswordTooShort)
     } else {
-        <CKind as MonadError<ValidationError, (String, String), IdentityKind>>::lift_either(Ok((
-            username, email,
-        )))
+        Checked::ok((username, email))
     }
 }
 
@@ -90,14 +84,9 @@ fn check_password(username: String, password: String, email: String) -> Checked<
 /// Builds the final `User` on success.
 fn check_email(username: String, email: String) -> Checked<User> {
     if !email.contains('@') {
-        <CKind as MonadError<ValidationError, User, IdentityKind>>::throw_error(
-            ValidationError::InvalidEmail,
-        )
+        Checked::throw(ValidationError::InvalidEmail)
     } else {
-        <CKind as MonadError<ValidationError, User, IdentityKind>>::lift_either(Ok(User {
-            username,
-            email,
-        }))
+        Checked::ok(User { username, email })
     }
 }
 
@@ -200,8 +189,8 @@ fn main() {
 
     println!("=== All assertions passed! ===\n");
     println!("Key insight: `mdo!` with `Except<ValidationError, _>` sequences validation:");
-    println!("  * `throw_error(e)`      injects an error; all later `bind` steps are skipped.");
-    println!("  * `lift_either(Ok(x))`  lifts a success value into the Except monad.");
+    println!("  * `Checked::throw(e)`   injects an error; all later `bind` steps are skipped.");
+    println!("  * `Checked::ok(x)`      lifts a success value into the Except monad.");
     println!("  * `ExceptT::bind`       propagates `Err` without running the continuation.");
     println!("  * `run_except_t`        is a VALUE field; unwrap via `let Identity(res) = prog.run_except_t`.");
     println!("  * Each step carries forward the data the next step needs as its bind-result");

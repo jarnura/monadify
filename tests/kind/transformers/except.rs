@@ -201,6 +201,105 @@ fn with_except_t_maps_error_channel() {
     assert_eq!(r2, Ok(9));
 }
 
+// ── Inherent ergonomic API: identity-inner (Except<String, _>) ───────────────
+
+#[test]
+fn inherent_throw_equals_trait_throw_error() {
+    let inherent: E<i32> = ExceptT::throw("boom".to_string());
+    let trait_form: E<i32> =
+        <EKind as MonadError<String, i32, IdentityKind>>::throw_error("boom".to_string());
+    assert_eq!(run_id(inherent), run_id(trait_form));
+}
+
+#[test]
+fn inherent_ok_equals_trait_lift_either_ok() {
+    let inherent: E<i32> = ExceptT::ok(42);
+    let trait_form: E<i32> = <EKind as MonadError<String, i32, IdentityKind>>::lift_either(Ok(42));
+    assert_eq!(run_id(inherent), run_id(trait_form));
+}
+
+#[test]
+fn inherent_from_result_ok_equals_trait_lift_either() {
+    let r: Result<i32, String> = Ok(7);
+    let inherent: E<i32> = ExceptT::from_result(r.clone());
+    let trait_form: E<i32> = <EKind as MonadError<String, i32, IdentityKind>>::lift_either(r);
+    assert_eq!(run_id(inherent), run_id(trait_form));
+}
+
+#[test]
+fn inherent_from_result_err_equals_trait_lift_either() {
+    let r: Result<i32, String> = Err("x".to_string());
+    let inherent: E<i32> = ExceptT::from_result(r.clone());
+    let trait_form: E<i32> = <EKind as MonadError<String, i32, IdentityKind>>::lift_either(r);
+    assert_eq!(run_id(inherent), run_id(trait_form));
+}
+
+#[test]
+fn inherent_catch_err_runs_handler_matches_trait() {
+    let handler = |_e: String| -> E<i32> { ExceptT::ok(0) };
+    let inherent: E<i32> = ExceptT::throw("bad".to_string()).catch(handler.clone());
+    let trait_form: E<i32> = <EKind as MonadError<String, i32, IdentityKind>>::catch_error(
+        ExceptT::throw("bad".to_string()),
+        handler,
+    );
+    assert_eq!(run_id(inherent), run_id(trait_form));
+}
+
+#[test]
+fn inherent_catch_ok_skips_handler_matches_trait() {
+    let handler = |_e: String| -> E<i32> { ExceptT::ok(-1) };
+    let inherent: E<i32> = ExceptT::ok(7_i32).catch(handler.clone());
+    let trait_form: E<i32> =
+        <EKind as MonadError<String, i32, IdentityKind>>::catch_error(ExceptT::ok(7), handler);
+    assert_eq!(run_id(inherent), run_id(trait_form));
+}
+
+// ── Inherent ergonomic API: OptionKind inner monad ───────────────────────────
+
+#[test]
+fn inherent_throw_option_inner_equals_trait() {
+    let inherent: OptE<i32> = ExceptT::throw("oops".to_string());
+    let trait_form: OptE<i32> =
+        <OptEKind as MonadError<String, i32, OptionKind>>::throw_error("oops".to_string());
+    assert_eq!(inherent.run_except_t, trait_form.run_except_t);
+}
+
+#[test]
+fn inherent_ok_option_inner_equals_trait() {
+    let inherent: OptE<i32> = ExceptT::ok(5);
+    let trait_form: OptE<i32> =
+        <OptEKind as MonadError<String, i32, OptionKind>>::lift_either(Ok(5));
+    assert_eq!(inherent.run_except_t, trait_form.run_except_t);
+}
+
+#[test]
+fn inherent_from_result_option_inner_equals_trait() {
+    let r: Result<i32, String> = Err("e".to_string());
+    let inherent: OptE<i32> = ExceptT::from_result(r.clone());
+    let trait_form: OptE<i32> = <OptEKind as MonadError<String, i32, OptionKind>>::lift_either(r);
+    assert_eq!(inherent.run_except_t, trait_form.run_except_t);
+}
+
+#[test]
+fn inherent_catch_option_inner_err_runs_handler() {
+    let handler = |_e: String| -> OptE<i32> { ExceptT::ok(0) };
+    let inherent: OptE<i32> = ExceptT::throw("e".to_string()).catch(handler.clone());
+    let trait_form: OptE<i32> = <OptEKind as MonadError<String, i32, OptionKind>>::catch_error(
+        ExceptT::throw("e".to_string()),
+        handler,
+    );
+    assert_eq!(inherent.run_except_t, trait_form.run_except_t);
+}
+
+#[test]
+fn inherent_catch_option_inner_ok_skips_handler() {
+    let handler = |_e: String| -> OptE<i32> { ExceptT::ok(-1) };
+    let inherent: OptE<i32> = ExceptT::ok(3_i32).catch(handler.clone());
+    let trait_form: OptE<i32> =
+        <OptEKind as MonadError<String, i32, OptionKind>>::catch_error(ExceptT::ok(3), handler);
+    assert_eq!(inherent.run_except_t, trait_form.run_except_t);
+}
+
 // ── Effectful inner monad: OptionKind threading + inner None ─────────────────
 
 type OptE<A> = ExceptT<String, OptionKind, A>;
