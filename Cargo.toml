@@ -96,3 +96,6 @@ required-features = ["do-notation"]
 [[example]]
 name = "except_order_pipeline"
 required-features = ["do-notation"]
+
+[[example]]
+name = "interpreter_full_stack"

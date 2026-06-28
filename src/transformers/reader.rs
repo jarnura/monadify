@@ -186,6 +186,17 @@ pub mod kind {
     #[derive(Default)]
     pub struct ReaderTKind<R, MKind: Kind1>(PhantomData<(R, MKind)>); // Renamed ReaderTHKTMarker, MMarker to MKind, HKT1 to Kind1
 
+    // Unconditional `Clone`: the marker is a zero-sized `PhantomData`, so it is
+    // always cloneable. A `#[derive(Clone)]` would wrongly demand `R: Clone,
+    // MKind: Clone`; this matters when `ReaderTKind` is the *inner* monad of a
+    // stacked transformer whose carrier `#[derive(Clone)]` propagates a
+    // `MKind: Clone` bound.
+    impl<R, MKind: Kind1> Clone for ReaderTKind<R, MKind> {
+        fn clone(&self) -> Self {
+            ReaderTKind(PhantomData)
+        }
+    }
+
     impl<R, MKind: Kind1> Kind for ReaderTKind<R, MKind> {
         // Renamed ReaderTHKTMarker, MMarker to MKind, HKT to Kind, HKT1 to Kind1
         type Of<A> = ReaderT<R, MKind, A>; // Changed Applied to Of

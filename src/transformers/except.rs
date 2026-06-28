@@ -147,6 +147,17 @@ pub mod kind {
     #[derive(Default)]
     pub struct ExceptTKind<E, MKind: Kind1>(PhantomData<(E, MKind)>);
 
+    // Unconditional `Clone`: the marker is a zero-sized `PhantomData`, so it is
+    // always cloneable. A `#[derive(Clone)]` would wrongly demand `E: Clone,
+    // MKind: Clone`; this matters when `ExceptTKind` is the *inner* monad of a
+    // stacked transformer whose carrier `#[derive(Clone)]` propagates a
+    // `MKind: Clone` bound.
+    impl<E, MKind: Kind1> Clone for ExceptTKind<E, MKind> {
+        fn clone(&self) -> Self {
+            ExceptTKind(PhantomData)
+        }
+    }
+
     impl<E, MKind: Kind1> Kind for ExceptTKind<E, MKind> {
         type Of<A> = ExceptT<E, MKind, A>;
     }

@@ -136,6 +136,15 @@ pub mod kind {
     #[derive(Default)]
     pub struct StateTKind<S, MKind: Kind1>(PhantomData<(S, MKind)>);
 
+    // Manual `Clone`: `StateTKind` is a zero-sized marker (`PhantomData`), so
+    // cloning it is always a no-op — no bounds on `S` or `MKind` are needed.
+    // A `#[derive(Clone)]` would incorrectly demand `S: Clone, MKind: Clone`.
+    impl<S, MKind: Kind1> Clone for StateTKind<S, MKind> {
+        fn clone(&self) -> Self {
+            StateTKind(PhantomData)
+        }
+    }
+
     impl<S, MKind: Kind1> Kind for StateTKind<S, MKind> {
         type Of<A> = StateT<S, MKind, A>;
     }

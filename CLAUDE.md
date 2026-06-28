@@ -76,6 +76,17 @@ catch-pure) and throw-left-zero law-tested. `ExceptT` also provides inherent
 `M::Of<A>` into any of the four transformers, adding no effect (`ExceptT`'s
 `lift` wraps the value in `Ok`).
 
+**Stacking.** The transformers nest by making one's inner Kind the next's marker,
+e.g. `ReaderTKind<Env, StateTKind<St, WriterTKind<Log, ExceptTKind<Err, IdentityKind>>>>`.
+For this to work all four Kind marker structs impl **unconditional `Clone`** (they are
+zero-sized `PhantomData`): `StateT`/`ReaderT` `#[derive(Clone)]` propagates a `MKind: Clone`
+bound to the *inner* marker, so a stacked carrier could not be `Clone` (needed by `lift`
+and `mdo!`) without it. There is **no mtl-style auto-lifting** — each layer's ops are
+hand-lifted to the top (`ask` at the top, State `lift`ed once, Writer twice, Except thrice).
+`examples/interpreter_full_stack.rs` is the worked end-to-end demo (a tiny expression
+interpreter); note that with `ExceptT` innermost a thrown error discards the accumulated
+state and log (the stack order decides the error semantics).
+
 ## Conventions
 
 - **Laws are first-class:** every trait documents *and* tests its laws (Functor
