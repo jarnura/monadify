@@ -120,6 +120,15 @@ pub mod kind {
     #[derive(Default)]
     pub struct WriterTKind<W, MKind: Kind1>(PhantomData<(W, MKind)>);
 
+    // Manual `Clone`: `WriterTKind` is a zero-sized marker (`PhantomData`), so
+    // cloning it is always a no-op — no bounds on `W` or `MKind` are needed.
+    // A `#[derive(Clone)]` would incorrectly demand `W: Clone, MKind: Clone`.
+    impl<W, MKind: Kind1> Clone for WriterTKind<W, MKind> {
+        fn clone(&self) -> Self {
+            WriterTKind(PhantomData)
+        }
+    }
+
     impl<W, MKind: Kind1> Kind for WriterTKind<W, MKind> {
         type Of<A> = WriterT<W, MKind, A>;
     }

@@ -7,7 +7,7 @@
 //!
 //! Run with: `cargo run --example except_safe_calculator --features do-notation`
 
-use monadify::monad::kind::Bind;
+use monadify::mdo;
 use monadify::transformers::except::{Except, ExceptTKind};
 use monadify::{Identity, IdentityKind};
 
@@ -107,16 +107,26 @@ fn main() {
     );
     println!("  {:?}  PASSED\n", res5);
 
-    // ── Test 6: bind sequences two safe operations (exact: sqrt(4.0) == 2.0) ──
-    println!("Test 6: bind — sqrt(safe_div(16.0, 4.0)) == sqrt(4.0) == 2.0");
-    let chained = CKind::bind(safe_div(16.0, 4.0), safe_sqrt);
+    // ── Test 6: mdo! sequences two safe operations (exact: sqrt(4.0) == 2.0) ──
+    println!("Test 6: mdo! — sqrt(safe_div(16.0, 4.0)) == sqrt(4.0) == 2.0");
+    let chained = mdo! {
+        CKind;
+        x <- safe_div(16.0, 4.0);
+        y <- safe_sqrt(x);
+        pure(y)
+    };
     let Identity(res6) = chained.run_except_t;
     assert_eq!(res6, Ok(2.0), "expected Ok(2.0), got {:?}", res6);
     println!("  {:?}  PASSED\n", res6);
 
-    // ── Test 7: bind short-circuits — DivByZero skips the sqrt step ───────────
-    println!("Test 7: bind — DivByZero short-circuits, sqrt step never runs");
-    let short_circuit = CKind::bind(safe_div(1.0, 0.0), safe_sqrt);
+    // ── Test 7: mdo! short-circuits — DivByZero skips the sqrt step ───────────
+    println!("Test 7: mdo! — DivByZero short-circuits, sqrt step never runs");
+    let short_circuit = mdo! {
+        CKind;
+        x <- safe_div(1.0, 0.0);
+        y <- safe_sqrt(x);
+        pure(y)
+    };
     let Identity(res7) = short_circuit.run_except_t;
     assert_eq!(
         res7,
@@ -133,6 +143,6 @@ fn main() {
     println!("  * ok     lifts a value onto the success branch.");
     println!("  * catch  intercepts Err and runs a recovery handler;");
     println!("           Ok values pass through with the handler never called.");
-    println!("  * bind   sequences steps, propagating Err without calling");
-    println!("           the continuation — total short-circuit semantics.");
+    println!("  * mdo!   sequences steps via do-notation; an Err in any step");
+    println!("           short-circuits the rest — the continuation never runs.");
 }

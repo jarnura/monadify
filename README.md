@@ -178,6 +178,15 @@ cargo run --example except_config_loader   --features do-notation
 cargo run --example except_order_pipeline   --features do-notation
 ```
 
+### Combined transformer stack example
+
+- `interpreter_full_stack.rs` — a tiny expression interpreter stacking all four transformers: `ReaderT` (variable environment) + `StateT` (step counter) + `WriterT` (pre-order trace) + `ExceptT` (unbound-variable / divide-by-zero errors). Because `ExceptT` is the innermost layer, a thrown error discards the accumulated state and trace — the key ordering-semantics teaching point.
+
+Run with:
+```bash
+cargo run --quiet --example interpreter_full_stack
+```
+
 ## Building the Project
 
 To build the library:
