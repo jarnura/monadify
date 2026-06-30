@@ -30,11 +30,23 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Lint lib & bins (deny warnings)
-        run: cargo clippy --all-features -- -D warnings
-      # Guards benches/compare.rs from silently rotting (e.g. stale marker names).
-      - name: Lint benches (deny warnings)
-        run: cargo clippy --all-features --benches -- -D warnings
+      # `--all-targets` covers lib, bins, tests, benches, and examples in one pass,
+      # so test/bench/example code (e.g. benches/compare.rs) can't silently rot.
+      - name: Lint all targets (deny warnings)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  doc:
+    name: doc
+    runs-on: ubuntu-latest
+    # Fail the build on any rustdoc warning (broken intra-doc links, etc.).
+    env:
+      RUSTDOCFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build docs (deny warnings)
+        run: cargo doc --no-deps --all-features
 
   test:
     name: test (${{ matrix.name }})
